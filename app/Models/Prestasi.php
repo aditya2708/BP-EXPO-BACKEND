@@ -22,6 +22,17 @@ class Prestasi extends Model
         'is_read'
     ];
 
+    protected $appends = ['foto_url'];
+
+    public function getFotoUrlAttribute()
+    {
+        if ($this->foto) {
+            return url("storage/Prestasi/{$this->id_anak}/{$this->foto}");
+        }
+        
+        return null;
+    }
+
     public function anak()
     {
         return $this->belongsTo(Anak::class, 'id_anak');
