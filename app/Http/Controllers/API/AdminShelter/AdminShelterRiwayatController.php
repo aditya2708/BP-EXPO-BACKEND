@@ -9,23 +9,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use App\Http\Resources\Histori\HistoriCollection;
 
 class AdminShelterRiwayatController extends Controller
 {
-    /**
-     * Display a listing of history records for a child
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $anakId
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function index(Request $request, $anakId)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
@@ -33,58 +23,55 @@ class AdminShelterRiwayatController extends Controller
             ], 403);
         }
 
-        // Check if anak exists and belongs to the shelter
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
-                    ->findOrFail($anakId);
+                    ->where('id_anak', $anakId)
+                    ->first();
 
-        // Query for histories of this child
-        $query = Histori::where('id_anak', $anakId);
-
-        // Filter by jenis_histori if provided
-        if ($request->has('jenis_histori')) {
-            $query->where('jenis_histori', $request->jenis_histori);
+        if (!$anak) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anak not found'
+            ], 404);
         }
 
-        // Default pagination
+        $query = Histori::where('id_anak', $anakId);
+
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('jenis_histori', 'like', "%{$search}%")
+                  ->orWhere('nama_histori', 'like', "%{$search}%");
+            });
+        }
+
         $perPage = $request->per_page ?? 10;
+        $riwayat = $query->latest('tanggal')->paginate($perPage);
 
-        // Paginate
-        $histories = $query->latest()->paginate($perPage);
-
-        // Calculate summary
-        $summary = [
-            'total_histori' => Histori::where('id_anak', $anakId)->count(),
-        ];
+        foreach ($riwayat as $item) {
+            if ($item->foto) {
+                $item->foto_url = url("storage/Histori/{$anakId}/{$item->foto}");
+            }
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Daftar Riwayat Anak',
-            'data' => HistoriCollection::collection($histories),
+            'message' => 'Daftar Riwayat',
+            'data' => $riwayat->items(),
             'pagination' => [
-                'total' => $histories->total(),
-                'per_page' => $histories->perPage(),
-                'current_page' => $histories->currentPage(),
-                'last_page' => $histories->lastPage(),
-                'from' => $histories->firstItem(),
-                'to' => $histories->lastItem()
-            ],
-            'summary' => $summary
+                'total' => $riwayat->total(),
+                'per_page' => $riwayat->perPage(),
+                'current_page' => $riwayat->currentPage(),
+                'last_page' => $riwayat->lastPage(),
+                'from' => $riwayat->firstItem(),
+                'to' => $riwayat->lastItem()
+            ]
         ], 200);
     }
 
-    /**
-     * Display the specified history record
-     *
-     * @param  int  $anakId
-     * @param  int  $historiId
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function show($anakId, $historiId)
+    public function show($anakId, $riwayatId)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
@@ -92,34 +79,44 @@ class AdminShelterRiwayatController extends Controller
             ], 403);
         }
 
-        // Check if anak exists and belongs to the shelter
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
-                    ->findOrFail($anakId);
+                    ->where('id_anak', $anakId)
+                    ->first();
 
-        // Find history record for this child
-        $histori = Histori::where('id_anak', $anakId)
-                          ->findOrFail($historiId);
+        if (!$anak) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anak not found'
+            ], 404);
+        }
+
+        $riwayat = Histori::where('id_anak', $anakId)
+                          ->where('id_histori', $riwayatId)
+                          ->with('anak')
+                          ->first();
+
+        if (!$riwayat) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Riwayat not found'
+            ], 404);
+        }
+
+        if ($riwayat->foto) {
+            $riwayat->foto_url = url("storage/Histori/{$anakId}/{$riwayat->foto}");
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Detail Riwayat',
-            'data' => new HistoriCollection($histori)
+            'data' => $riwayat
         ], 200);
     }
 
-    /**
-     * Store a newly created history record
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $anakId
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function store(Request $request, $anakId)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
@@ -127,63 +124,61 @@ class AdminShelterRiwayatController extends Controller
             ], 403);
         }
 
-        // Check if anak exists and belongs to the shelter
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
-                    ->findOrFail($anakId);
+                    ->where('id_anak', $anakId)
+                    ->first();
 
-        // Validation rules
+        if (!$anak) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anak not found'
+            ], 404);
+        }
+
         $validatedData = $request->validate([
             'jenis_histori' => 'required|string|max:255',
             'nama_histori' => 'required|string|max:255',
-            'di_opname' => 'required|string|max:255',
-            'dirawat_id' => 'nullable|exists:anak,id_anak',
-            'tanggal' => 'nullable|date',
-            'foto' => 'nullable|image|max:2048', // max 2MB
-            'is_read' => 'nullable|boolean',
+            'di_opname' => 'required|in:YA,TIDAK',
+            'dirawat_id' => 'required_if:di_opname,YA|nullable|string|max:255',
+            'tanggal' => 'required|date',
+            'foto' => 'nullable|image|max:2048'
         ]);
 
-        // Create Histori record with anak_id
-        $histori = new Histori();
-        $histori->id_anak = $anakId;
-        $histori->fill($validatedData);
+        $validatedData['id_anak'] = $anakId;
+        $validatedData['is_read'] = "Tidak";
         
-        // Set default values for nullable fields
-        $histori->tanggal = $histori->tanggal ?? now();
-        $histori->is_read = $request->has('is_read') ? $request->is_read : false;
+        if ($validatedData['di_opname'] === 'TIDAK') {
+            $validatedData['dirawat_id'] = null;
+        }
 
-        // Save to get the ID first
-        $histori->save();
+        $riwayat = new Histori($validatedData);
+        $riwayat->save();
 
-        // Handle foto upload
         if ($request->hasFile('foto')) {
             $file = $request->file('foto');
             $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
             $path = $file->storeAs("Histori/{$anakId}", $filename, 'public');
-            $histori->foto = $filename;
-            $histori->save();
+            $riwayat->foto = $filename;
+            $riwayat->save();
+        }
+
+        $riwayat->load('anak');
+
+        if ($riwayat->foto) {
+            $riwayat->foto_url = url("storage/Histori/{$anakId}/{$riwayat->foto}");
         }
 
         return response()->json([
             'success' => true,
             'message' => 'Riwayat berhasil ditambahkan',
-            'data' => new HistoriCollection($histori)
+            'data' => $riwayat
         ], 201);
     }
 
-    /**
-     * Update the specified history record
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $anakId
-     * @param  int  $historiId
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function update(Request $request, $anakId, $historiId)
+    public function update(Request $request, $anakId, $riwayatId)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
@@ -191,63 +186,72 @@ class AdminShelterRiwayatController extends Controller
             ], 403);
         }
 
-        // Check if anak exists and belongs to the shelter
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
-                    ->findOrFail($anakId);
+                    ->where('id_anak', $anakId)
+                    ->first();
 
-        // Find history record for this child
-        $histori = Histori::where('id_anak', $anakId)
-                          ->findOrFail($historiId);
+        if (!$anak) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anak not found'
+            ], 404);
+        }
 
-        // Validation rules
+        $riwayat = Histori::where('id_anak', $anakId)
+                          ->where('id_histori', $riwayatId)
+                          ->first();
+
+        if (!$riwayat) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Riwayat not found'
+            ], 404);
+        }
+
         $validatedData = $request->validate([
             'jenis_histori' => 'sometimes|string|max:255',
             'nama_histori' => 'sometimes|string|max:255',
-            'di_opname' => 'required|string|max:255',
-            'dirawat_id' => 'nullable|exists:anak,id_anak',
-            'tanggal' => 'nullable|date',
-            'foto' => 'nullable|image|max:2048', // max 2MB
-            'is_read' => 'nullable|boolean',
+            'di_opname' => 'sometimes|in:YA,TIDAK',
+            'dirawat_id' => 'required_if:di_opname,YA|nullable|string|max:255',
+            'tanggal' => 'sometimes|date',
+            'foto' => 'nullable|image|max:2048'
         ]);
+        
+        if (isset($validatedData['di_opname']) && $validatedData['di_opname'] === 'TIDAK') {
+            $validatedData['dirawat_id'] = null;
+        }
 
-        // Update Histori record
-        $histori->fill($validatedData);
+        $riwayat->fill($validatedData);
 
-        // Handle foto upload
         if ($request->hasFile('foto')) {
-            // Delete old foto if exists
-            if ($histori->foto) {
-                Storage::disk('public')->delete("Histori/{$anakId}/{$histori->foto}");
+            if ($riwayat->foto) {
+                Storage::disk('public')->delete("Histori/{$anakId}/{$riwayat->foto}");
             }
 
             $file = $request->file('foto');
             $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
             $path = $file->storeAs("Histori/{$anakId}", $filename, 'public');
-            $histori->foto = $filename;
+            $riwayat->foto = $filename;
         }
 
-        $histori->save();
+        $riwayat->save();
+        $riwayat->load('anak');
+
+        if ($riwayat->foto) {
+            $riwayat->foto_url = url("storage/Histori/{$anakId}/{$riwayat->foto}");
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Riwayat berhasil diperbarui',
-            'data' => new HistoriCollection($histori)
+            'data' => $riwayat
         ], 200);
     }
 
-    /**
-     * Remove the specified history record
-     *
-     * @param  int  $anakId
-     * @param  int  $historiId
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function destroy($anakId, $historiId)
+    public function destroy($anakId, $riwayatId)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
@@ -255,21 +259,33 @@ class AdminShelterRiwayatController extends Controller
             ], 403);
         }
 
-        // Check if anak exists and belongs to the shelter
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
-                    ->findOrFail($anakId);
+                    ->where('id_anak', $anakId)
+                    ->first();
 
-        // Find history record for this child
-        $histori = Histori::where('id_anak', $anakId)
-                          ->findOrFail($historiId);
-
-        // Delete associated foto if exists
-        if ($histori->foto) {
-            Storage::disk('public')->delete("Histori/{$anakId}/{$histori->foto}");
+        if (!$anak) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anak not found'
+            ], 404);
         }
 
-        // Delete the histori record
-        $histori->delete();
+        $riwayat = Histori::where('id_anak', $anakId)
+                          ->where('id_histori', $riwayatId)
+                          ->first();
+
+        if (!$riwayat) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Riwayat not found'
+            ], 404);
+        }
+
+        if ($riwayat->foto) {
+            Storage::disk('public')->delete("Histori/{$anakId}/{$riwayat->foto}");
+        }
+
+        $riwayat->delete();
 
         return response()->json([
             'success' => true,

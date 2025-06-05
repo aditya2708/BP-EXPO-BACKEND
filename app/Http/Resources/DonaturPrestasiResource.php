@@ -15,7 +15,7 @@ class DonaturPrestasiResource extends JsonResource
             'level_prestasi' => $this->level_prestasi,
             'nama_prestasi' => $this->nama_prestasi,
             'foto' => $this->foto,
-            'foto_url' => $this->foto ? url("storage/Prestasi/{$this->id_anak}/{$this->foto}") : null,
+            'foto_url' => $this->foto_url,
             'tgl_upload' => $this->tgl_upload,
             'is_read' => $this->is_read,
             'anak' => [

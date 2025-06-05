@@ -12,9 +12,6 @@ use Illuminate\Support\Facades\Auth;
 
 class AdminShelterKelompokController extends Controller
 {
-   /**
-    * Menampilkan daftar Kelompok dengan pagination
-    */
    public function index(Request $request)
   {
       $adminShelter = Auth::user()->adminShelter;
@@ -87,7 +84,7 @@ class AdminShelterKelompokController extends Controller
         },
         'anak'
     ])
-    ->withCount('anak')  // Add this to get anak count
+    ->withCount('anak')
     ->findOrFail($id);
 
     return response()->json([
@@ -97,15 +94,10 @@ class AdminShelterKelompokController extends Controller
     ], 200);
 }
 
-   /**
-    * Membuat Kelompok baru
-    */
    public function store(Request $request)
    {
-       // Dapatkan admin shelter yang sedang login
        $adminShelter = Auth::user()->adminShelter;
 
-       // Pastikan admin shelter memiliki shelter
        if (!$adminShelter || !$adminShelter->shelter) {
            return response()->json([
                'success' => false,
@@ -119,13 +111,11 @@ class AdminShelterKelompokController extends Controller
                'required', 
                'string', 
                'max:255', 
-               // Pastikan nama kelompok unik dalam shelter yang sama
                'unique:kelompok,nama_kelompok,NULL,id_kelompok,id_shelter,' . $adminShelter->shelter->id_shelter
            ],
            'jumlah_anggota' => 'nullable|integer|min:0'
        ]);
 
-       // Gunakan id_shelter dari admin shelter yang login
        $validatedData['id_shelter'] = $adminShelter->shelter->id_shelter;
 
        $kelompok = Kelompok::create($validatedData);
@@ -137,15 +127,10 @@ class AdminShelterKelompokController extends Controller
        ], 201);
    }
 
-   /**
-    * Memperbarui Kelompok
-    */
    public function update(Request $request, $id)
    {
-       // Dapatkan admin shelter yang sedang login
        $adminShelter = Auth::user()->adminShelter;
 
-       // Pastikan admin shelter memiliki shelter
        if (!$adminShelter || !$adminShelter->shelter) {
            return response()->json([
                'success' => false,
@@ -155,7 +140,6 @@ class AdminShelterKelompokController extends Controller
 
        $kelompok = Kelompok::findOrFail($id);
 
-       // Pastikan kelompok milik shelter yang sama
        if ($kelompok->id_shelter !== $adminShelter->shelter->id_shelter) {
            return response()->json([
                'success' => false,
@@ -169,11 +153,14 @@ class AdminShelterKelompokController extends Controller
                'sometimes', 
                'string', 
                'max:255', 
-               // Pastikan nama kelompok unik dalam shelter yang sama, kecuali untuk kelompok saat ini
                'unique:kelompok,nama_kelompok,' . $id . ',id_kelompok,id_shelter,' . $adminShelter->shelter->id_shelter
            ],
            'jumlah_anggota' => 'nullable|integer|min:0'
        ]);
+
+       if (isset($validatedData['id_level_anak_binaan']) && $validatedData['id_level_anak_binaan'] !== $kelompok->id_level_anak_binaan) {
+           $kelompok->anak()->update(['id_level_anak_binaan' => $validatedData['id_level_anak_binaan']]);
+       }
 
        $kelompok->update($validatedData);
 
@@ -184,15 +171,10 @@ class AdminShelterKelompokController extends Controller
        ], 200);
    }
 
-   /**
-    * Menghapus Kelompok
-    */
    public function destroy($id)
    {
-       // Dapatkan admin shelter yang sedang login
        $adminShelter = Auth::user()->adminShelter;
 
-       // Pastikan admin shelter memiliki shelter
        if (!$adminShelter || !$adminShelter->shelter) {
            return response()->json([
                'success' => false,
@@ -202,7 +184,6 @@ class AdminShelterKelompokController extends Controller
 
        $kelompok = Kelompok::findOrFail($id);
 
-       // Pastikan kelompok milik shelter yang sama
        if ($kelompok->id_shelter !== $adminShelter->shelter->id_shelter) {
            return response()->json([
                'success' => false,
@@ -210,7 +191,6 @@ class AdminShelterKelompokController extends Controller
            ], 403);
        }
 
-       // Optional: Validate if kelompok has no anak before deleting
        if ($kelompok->anak()->count() > 0) {
            return response()->json([
                'success' => false,
@@ -226,9 +206,6 @@ class AdminShelterKelompokController extends Controller
        ], 200);
    }
 
-   /**
-    * Mendapatkan daftar level anak binaan
-    */
    public function getLevels()
    {
        $levels = LevelAnakBinaan::all();
@@ -240,15 +217,10 @@ class AdminShelterKelompokController extends Controller
        ], 200);
    }
 
-   /**
-    * Mendapatkan daftar anak yang belum memiliki kelompok
-    */
    public function getAvailableChildren($id_shelter)
    {
-       // Dapatkan admin shelter yang sedang login
        $adminShelter = Auth::user()->adminShelter;
 
-       // Pastikan admin shelter memiliki shelter
        if (!$adminShelter || !$adminShelter->shelter) {
            return response()->json([
                'success' => false,
@@ -256,7 +228,6 @@ class AdminShelterKelompokController extends Controller
            ], 403);
        }
 
-       // Pastikan shelter yang diminta adalah milik admin yang login
        if ($adminShelter->shelter->id_shelter != $id_shelter) {
            return response()->json([
                'success' => false,
@@ -264,9 +235,9 @@ class AdminShelterKelompokController extends Controller
            ], 403);
        }
 
-       // Dapatkan anak yang belum memiliki kelompok
        $anakBinaan = Anak::where('id_shelter', $id_shelter)
                        ->whereNull('id_kelompok')
+                       ->with('anakPendidikan')
                        ->get();
 
        return response()->json([
@@ -276,15 +247,10 @@ class AdminShelterKelompokController extends Controller
        ], 200);
    }
 
-   /**
-    * Mendapatkan daftar anak dalam kelompok
-    */
    public function getGroupChildren($id_kelompok)
    {
-       // Dapatkan admin shelter yang sedang login
        $adminShelter = Auth::user()->adminShelter;
 
-       // Pastikan admin shelter memiliki shelter
        if (!$adminShelter || !$adminShelter->shelter) {
            return response()->json([
                'success' => false,
@@ -294,7 +260,6 @@ class AdminShelterKelompokController extends Controller
 
        $kelompok = Kelompok::findOrFail($id_kelompok);
 
-       // Pastikan kelompok milik shelter admin yang login
        if ($kelompok->id_shelter !== $adminShelter->shelter->id_shelter) {
            return response()->json([
                'success' => false,
@@ -302,7 +267,6 @@ class AdminShelterKelompokController extends Controller
            ], 403);
        }
 
-       // Dapatkan anak dalam kelompok
        $anakBinaan = Anak::where('id_kelompok', $id_kelompok)->get();
 
        return response()->json([
@@ -312,15 +276,40 @@ class AdminShelterKelompokController extends Controller
        ], 200);
    }
 
-   /**
-    * Menambahkan anak ke kelompok
-    */
+   private function validateEducationLevelCompatibility($anak, $kelompok)
+   {
+       if (!$anak->anakPendidikan || !$kelompok->levelAnakBinaan) {
+           return true;
+       }
+
+       $jenjang = strtolower(trim($anak->anakPendidikan->jenjang));
+       $levelName = strtolower(trim($kelompok->levelAnakBinaan->nama_level_binaan));
+
+       $compatibility = [
+           'belum_sd' => ['tk', 'paud', 'early', 'dini', 'kelas 1', 'kelas 2', 'kelas 3'],
+           'sd' => ['sd', 'elementary', 'dasar', 'kelas 1', 'kelas 2', 'kelas 3', 'kelas 4', 'kelas 5', 'kelas 6'],
+           'smp' => ['smp', 'mts', 'junior', 'menengah pertama', 'kelas 7', 'kelas 8', 'kelas 9'],
+           'sma' => ['sma', 'smk', 'ma', 'senior', 'menengah atas', 'kelas 10', 'kelas 11', 'kelas 12'],
+           'perguruan_tinggi' => ['universitas', 'college', 'tinggi', 'sarjana', 'semester']
+       ];
+
+       if (!isset($compatibility[$jenjang])) {
+           return true;
+       }
+
+       foreach ($compatibility[$jenjang] as $keyword) {
+           if (strpos($levelName, $keyword) !== false) {
+               return true;
+           }
+       }
+
+       return false;
+   }
+
    public function addChildToGroup(Request $request, $id_kelompok)
    {
-       // Dapatkan admin shelter yang sedang login
        $adminShelter = Auth::user()->adminShelter;
 
-       // Pastikan admin shelter memiliki shelter
        if (!$adminShelter || !$adminShelter->shelter) {
            return response()->json([
                'success' => false,
@@ -328,9 +317,8 @@ class AdminShelterKelompokController extends Controller
            ], 403);
        }
 
-       $kelompok = Kelompok::findOrFail($id_kelompok);
+       $kelompok = Kelompok::with('levelAnakBinaan')->findOrFail($id_kelompok);
 
-       // Pastikan kelompok milik shelter admin yang login
        if ($kelompok->id_shelter !== $adminShelter->shelter->id_shelter) {
            return response()->json([
                'success' => false,
@@ -342,9 +330,8 @@ class AdminShelterKelompokController extends Controller
            'id_anak' => 'required|exists:anak,id_anak'
        ]);
 
-       $anak = Anak::findOrFail($validatedData['id_anak']);
+       $anak = Anak::with('anakPendidikan')->findOrFail($validatedData['id_anak']);
 
-       // Pastikan anak ada di shelter yang sama
        if ($anak->id_shelter !== $adminShelter->shelter->id_shelter) {
            return response()->json([
                'success' => false,
@@ -352,11 +339,24 @@ class AdminShelterKelompokController extends Controller
            ], 400);
        }
 
-       // Update id_kelompok anak
+       if ($anak->id_kelompok) {
+           return response()->json([
+               'success' => false,
+               'message' => 'Anak sudah berada dalam kelompok lain'
+           ], 400);
+       }
+
+       if (!$this->validateEducationLevelCompatibility($anak, $kelompok)) {
+           return response()->json([
+               'success' => false,
+               'message' => 'Tingkat pendidikan anak tidak sesuai dengan level kelompok'
+           ], 400);
+       }
+
        $anak->id_kelompok = $id_kelompok;
+       $anak->id_level_anak_binaan = $kelompok->id_level_anak_binaan;
        $anak->save();
 
-       // Update jumlah anggota kelompok
        $kelompok->jumlah_anggota = $kelompok->anak()->count();
        $kelompok->save();
 
@@ -367,15 +367,10 @@ class AdminShelterKelompokController extends Controller
        ], 200);
    }
 
-   /**
-    * Menghapus anak dari kelompok
-    */
    public function removeChildFromGroup(Request $request, $id_kelompok, $id_anak)
    {
-       // Dapatkan admin shelter yang sedang login
        $adminShelter = Auth::user()->adminShelter;
 
-       // Pastikan admin shelter memiliki shelter
        if (!$adminShelter || !$adminShelter->shelter) {
            return response()->json([
                'success' => false,
@@ -385,7 +380,6 @@ class AdminShelterKelompokController extends Controller
 
        $kelompok = Kelompok::findOrFail($id_kelompok);
 
-       // Pastikan kelompok milik shelter admin yang login
        if ($kelompok->id_shelter !== $adminShelter->shelter->id_shelter) {
            return response()->json([
                'success' => false,
@@ -395,7 +389,6 @@ class AdminShelterKelompokController extends Controller
 
        $anak = Anak::findOrFail($id_anak);
 
-       // Pastikan anak ada di kelompok yang dimaksud
        if ($anak->id_kelompok != $id_kelompok) {
            return response()->json([
                'success' => false,
@@ -403,11 +396,10 @@ class AdminShelterKelompokController extends Controller
            ], 400);
        }
 
-       // Hapus anak dari kelompok
        $anak->id_kelompok = null;
+       $anak->id_level_anak_binaan = null;
        $anak->save();
 
-       // Update jumlah anggota kelompok
        $kelompok->jumlah_anggota = $kelompok->anak()->count();
        $kelompok->save();
 
@@ -418,15 +410,10 @@ class AdminShelterKelompokController extends Controller
        ], 200);
    }
 
-   /**
-    * Memindahkan anak ke shelter lain
-    */
    public function moveChildToShelter(Request $request, $id_anak)
    {
-       // Dapatkan admin shelter yang sedang login
        $adminShelter = Auth::user()->adminShelter;
 
-       // Pastikan admin shelter memiliki shelter
        if (!$adminShelter || !$adminShelter->shelter) {
            return response()->json([
                'success' => false,
@@ -440,7 +427,6 @@ class AdminShelterKelompokController extends Controller
 
        $anak = Anak::findOrFail($id_anak);
 
-       // Pastikan anak ada di shelter admin yang login
        if ($anak->id_shelter !== $adminShelter->shelter->id_shelter) {
            return response()->json([
                'success' => false,
@@ -448,20 +434,17 @@ class AdminShelterKelompokController extends Controller
            ], 403);
        }
 
-       // Jika anak memiliki kelompok, update jumlah anggota kelompok lama
        if ($anak->id_kelompok) {
            $oldKelompok = Kelompok::findOrFail($anak->id_kelompok);
-           $anak->id_kelompok = null; // Hapus dari kelompok lama
+           $anak->id_kelompok = null;
+           $anak->id_level_anak_binaan = null;
            
-           // Simpan perubahan
            $anak->save();
            
-           // Update jumlah anggota kelompok lama
            $oldKelompok->jumlah_anggota = $oldKelompok->anak()->count();
            $oldKelompok->save();
        }
 
-       // Pindahkan anak ke shelter baru
        $anak->id_shelter = $validatedData['id_shelter_baru'];
        $anak->save();
 

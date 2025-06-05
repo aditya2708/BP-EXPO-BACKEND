@@ -83,9 +83,19 @@ class TutorAttendanceController extends Controller
             'arrival_time' => 'nullable|date_format:Y-m-d H:i:s'
         ]);
         
-        DB::beginTransaction();
-        
         try {
+            $aktivitas = Aktivitas::findOrFail($request->id_aktivitas);
+            $attendanceCheck = $aktivitas->canRecordAttendance();
+            
+            if (!$attendanceCheck['allowed']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $attendanceCheck['reason']
+                ], 422);
+            }
+            
+            DB::beginTransaction();
+            
             $tokenValidation = $this->qrTokenService->validateTutorToken($request->token);
             
             if (!$tokenValidation['valid']) {
@@ -96,7 +106,6 @@ class TutorAttendanceController extends Controller
             }
             
             $tutor = $tokenValidation['tutor'];
-            $aktivitas = Aktivitas::findOrFail($request->id_aktivitas);
             
             if ($aktivitas->id_tutor != $tutor->id_tutor) {
                 return response()->json([
@@ -149,8 +158,8 @@ class TutorAttendanceController extends Controller
             DB::rollback();
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to record attendance: ' . $e->getMessage()
-            ], 500);
+                'message' => $e->getMessage()
+            ], 400);
         }
     }
     
@@ -164,10 +173,18 @@ class TutorAttendanceController extends Controller
             'arrival_time' => 'nullable|date_format:Y-m-d H:i:s'
         ]);
         
-        DB::beginTransaction();
-        
         try {
             $aktivitas = Aktivitas::findOrFail($request->id_aktivitas);
+            $attendanceCheck = $aktivitas->canRecordAttendance();
+            
+            if (!$attendanceCheck['allowed']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $attendanceCheck['reason']
+                ], 422);
+            }
+            
+            DB::beginTransaction();
             
             if ($aktivitas->id_tutor != $request->id_tutor) {
                 return response()->json([
@@ -220,8 +237,8 @@ class TutorAttendanceController extends Controller
             DB::rollback();
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to record attendance: ' . $e->getMessage()
-            ], 500);
+                'message' => $e->getMessage()
+            ], 400);
         }
     }
     
@@ -337,12 +354,18 @@ class TutorAttendanceController extends Controller
             }
         }
         
+        $activityDate = Carbon::parse($aktivitas->tanggal)->startOfDay();
+        $currentDate = Carbon::now()->startOfDay();
+        
+        if ($activityDate->lt($currentDate)) {
+            return Absen::TEXT_TIDAK;
+        }
+        
         if (!$aktivitas->start_time) {
             return Absen::TEXT_YA;
         }
         
-        $activityDate = Carbon::parse($aktivitas->tanggal)->format('Y-m-d');
-        $comparisonTime = Carbon::parse($activityDate . ' ' . $arrivalTime->format('H:i:s'));
+        $comparisonTime = $arrivalTime;
         
         if ($aktivitas->end_time && $aktivitas->isAbsent($comparisonTime)) {
             return Absen::TEXT_TIDAK;

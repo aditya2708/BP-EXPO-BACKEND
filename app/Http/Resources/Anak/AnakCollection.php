@@ -6,12 +6,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class AnakCollection extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return array
-     */
     public function toArray($request)
     {
         return [
@@ -45,7 +39,6 @@ class AnakCollection extends JsonResource
             'foto_url' => $this->foto_url,
             'status' => $this->status,
 
-            // Optional relations if needed
             'kelompok' => $this->whenLoaded('kelompok', function () {
                 return [
                     'id_kelompok' => $this->kelompok->id_kelompok,
@@ -56,12 +49,35 @@ class AnakCollection extends JsonResource
                 return [
                     'id_shelter' => $this->shelter->id_shelter,
                     'nama_shelter' => $this->shelter->nama_shelter,
+                    'no_telp' => $this->shelter->no_telp,
+                    'alamat' => $this->shelter->alamat,
                 ];
             }),
             'keluarga' => $this->whenLoaded('keluarga', function () {
                 return [
                     'id_keluarga' => $this->keluarga->id_keluarga,
                     'kepala_keluarga' => $this->keluarga->kepala_keluarga,
+                    'no_kk' => $this->keluarga->no_kk,
+                    'status_ortu' => $this->keluarga->status_ortu,
+                ];
+            }),
+            'anakPendidikan' => $this->whenLoaded('anakPendidikan', function () {
+                return [
+                    'id_anak_pend' => $this->anakPendidikan->id_anak_pend,
+                    'jenjang' => $this->anakPendidikan->jenjang,
+                    'kelas' => $this->anakPendidikan->kelas,
+                    'nama_sekolah' => $this->anakPendidikan->nama_sekolah,
+                    'alamat_sekolah' => $this->anakPendidikan->alamat_sekolah,
+                    'jurusan' => $this->anakPendidikan->jurusan,
+                    'semester' => $this->anakPendidikan->semester,
+                    'nama_pt' => $this->anakPendidikan->nama_pt,
+                    'alamat_pt' => $this->anakPendidikan->alamat_pt,
+                ];
+            }),
+            'levelAnakBinaan' => $this->whenLoaded('levelAnakBinaan', function () {
+                return [
+                    'id_level_anak_binaan' => $this->levelAnakBinaan->id_level_anak_binaan,
+                    'nama_level_binaan' => $this->levelAnakBinaan->nama_level_binaan,
                 ];
             }),
         ];

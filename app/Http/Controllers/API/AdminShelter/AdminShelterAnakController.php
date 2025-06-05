@@ -12,18 +12,10 @@ use Illuminate\Support\Str;
 
 class AdminShelterAnakController extends Controller
 {
-    /**
-     * Display a listing of anak.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function index(Request $request)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
@@ -33,7 +25,6 @@ class AdminShelterAnakController extends Controller
 
         $query = Anak::where('id_shelter', $user->adminShelter->id_shelter);
 
-        // Search filter
         if ($request->has('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -43,21 +34,40 @@ class AdminShelterAnakController extends Controller
             });
         }
 
-        // Status filter
         if ($request->has('status')) {
             $query->where('status_validasi', $request->status);
         }
 
-        // Default pagination
+        if ($request->has('id_level_anak_binaan')) {
+            if ($request->id_level_anak_binaan === 'null') {
+                $query->whereNull('id_level_anak_binaan');
+            } else {
+                $query->where('id_level_anak_binaan', $request->id_level_anak_binaan);
+            }
+        }
+
+        if ($request->has('id_kelompok')) {
+            if ($request->id_kelompok === 'null') {
+                $query->whereNull('id_kelompok');
+            } else {
+                $query->where('id_kelompok', $request->id_kelompok);
+            }
+        }
+
+        if ($request->has('jenis_anak_binaan')) {
+            $query->where('jenis_anak_binaan', $request->jenis_anak_binaan);
+        }
+
+        if ($request->has('hafalan')) {
+            $query->where('hafalan', $request->hafalan);
+        }
+
         $perPage = $request->per_page ?? 10;
 
-        // Load relationships
-        $query->with(['kelompok', 'shelter']);
+        $query->with(['kelompok', 'shelter', 'anakPendidikan', 'levelAnakBinaan']);
 
-        // Paginate
         $anak = $query->latest()->paginate($perPage);
 
-        // Calculate summary
         $summary = [
             'total' => Anak::where('id_shelter', $user->adminShelter->id_shelter)->count(),
             'anak_aktif' => Anak::where('id_shelter', $user->adminShelter->id_shelter)
@@ -65,6 +75,12 @@ class AdminShelterAnakController extends Controller
                             ->count(),
             'anak_tidak_aktif' => Anak::where('id_shelter', $user->adminShelter->id_shelter)
                                 ->where('status_validasi', 'non-aktif')
+                                ->count(),
+            'dengan_kelompok' => Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                                ->whereNotNull('id_kelompok')
+                                ->count(),
+            'tanpa_kelompok' => Anak::where('id_shelter', $user->adminShelter->id_shelter)
+                                ->whereNull('id_kelompok')
                                 ->count(),
         ];
 
@@ -84,18 +100,10 @@ class AdminShelterAnakController extends Controller
         ], 200);
     }
 
-    /**
-     * Display the specified anak.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function show($id)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
@@ -103,13 +111,13 @@ class AdminShelterAnakController extends Controller
             ], 403);
         }
 
-        // Find anak by ID and ensure it belongs to the shelter
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
                     ->with([
                         'keluarga', 
                         'kelompok', 
                         'shelter', 
-                        'anakPendidikan'
+                        'anakPendidikan',
+                        'levelAnakBinaan'
                     ])
                     ->findOrFail($id);
 
@@ -120,18 +128,10 @@ class AdminShelterAnakController extends Controller
         ], 200);
     }
 
-    /**
-     * Store a newly created anak.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function store(Request $request)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
@@ -139,7 +139,6 @@ class AdminShelterAnakController extends Controller
             ], 403);
         }
 
-        // Validation rules
         $validatedData = $request->validate([
             'id_keluarga' => 'required|exists:keluarga,id_keluarga',
             'id_anak_pend' => 'nullable|exists:anak_pendidikan,id_anak_pend',
@@ -157,27 +156,26 @@ class AdminShelterAnakController extends Controller
             'jenis_anak_binaan' => 'required|in:BPCB,NPB',
             'hafalan' => 'required|in:Tahfidz,Non-Tahfidz',
             'status_validasi' => 'nullable|in:aktif,non-aktif,Ditolak,Ditangguhkan',
-            'foto' => 'nullable|image|max:2048', // max 2MB
+            'foto' => 'nullable|image|max:2048',
         ]);
 
-        // Add shelter ID from authenticated user
         $validatedData['id_shelter'] = $user->adminShelter->id_shelter;
 
-        // Create Anak record
+        if (isset($validatedData['id_kelompok'])) {
+            $kelompok = \App\Models\Kelompok::findOrFail($validatedData['id_kelompok']);
+            $validatedData['id_level_anak_binaan'] = $kelompok->id_level_anak_binaan;
+        }
+
         $anak = new Anak($validatedData);
 
-        // Set default status if not provided
         $anak->status_validasi = $validatedData['status_validasi'] ?? 'non-aktif';
 
-        // Determine status_cpb
         $anak->status_cpb = $validatedData['jenis_anak_binaan'] === 'BPCB' 
             ? Anak::STATUS_CPB_BCPB 
             : Anak::STATUS_CPB_NPB;
 
-        // Save to get the ID first
         $anak->save();
 
-        // Handle foto upload
         if ($request->hasFile('foto')) {
             $file = $request->file('foto');
             $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
@@ -193,19 +191,10 @@ class AdminShelterAnakController extends Controller
         ], 201);
     }
 
-    /**
-     * Update the specified anak.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function update(Request $request, $id)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
@@ -213,11 +202,9 @@ class AdminShelterAnakController extends Controller
             ], 403);
         }
 
-        // Find anak by ID and ensure it belongs to the shelter
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
                     ->findOrFail($id);
 
-        // Validation rules
         $validatedData = $request->validate([
             'id_keluarga' => 'sometimes|exists:keluarga,id_keluarga',
             'id_anak_pend' => 'nullable|exists:anak_pendidikan,id_anak_pend',
@@ -235,22 +222,27 @@ class AdminShelterAnakController extends Controller
             'jenis_anak_binaan' => 'sometimes|in:BPCB,NPB',
             'hafalan' => 'sometimes|in:Tahfidz,Non-Tahfidz',
             'status_validasi' => 'sometimes|in:aktif,non-aktif,Ditolak,Ditangguhkan',
-            'foto' => 'nullable|image|max:2048', // max 2MB
+            'foto' => 'nullable|image|max:2048',
         ]);
 
-        // Update Anak record
+        if (isset($validatedData['id_kelompok'])) {
+            if ($validatedData['id_kelompok'] === null) {
+                $validatedData['id_level_anak_binaan'] = null;
+            } else {
+                $kelompok = \App\Models\Kelompok::findOrFail($validatedData['id_kelompok']);
+                $validatedData['id_level_anak_binaan'] = $kelompok->id_level_anak_binaan;
+            }
+        }
+
         $anak->fill($validatedData);
 
-        // Determine status_cpb if jenis_anak_binaan is updated
         if (isset($validatedData['jenis_anak_binaan'])) {
             $anak->status_cpb = $validatedData['jenis_anak_binaan'] === 'BPCB' 
                 ? Anak::STATUS_CPB_BCPB 
                 : Anak::STATUS_CPB_NPB;
         }
 
-        // Handle foto upload
         if ($request->hasFile('foto')) {
-            // Delete old foto if exists
             if ($anak->foto) {
                 Storage::disk('public')->delete("Anak/{$anak->id_anak}/{$anak->foto}");
             }
@@ -270,18 +262,10 @@ class AdminShelterAnakController extends Controller
         ], 200);
     }
     
-    /**
-     * Toggle anak status between 'aktif' and 'non-aktif'.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function toggleStatus($id)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
@@ -289,11 +273,9 @@ class AdminShelterAnakController extends Controller
             ], 403);
         }
 
-        // Find anak by ID and ensure it belongs to the shelter
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
                     ->findOrFail($id);
 
-        // Toggle status between aktif and non-aktif
         $newStatus = $anak->status_validasi === 'aktif' ? 'non-aktif' : 'aktif';
         $anak->status_validasi = $newStatus;
         $anak->save();
@@ -308,18 +290,10 @@ class AdminShelterAnakController extends Controller
         ], 200);
     }
 
-    /**
-     * Remove the specified anak.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function destroy($id)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter) {
             return response()->json([
                 'success' => false,
@@ -327,16 +301,21 @@ class AdminShelterAnakController extends Controller
             ], 403);
         }
 
-        // Find anak by ID and ensure it belongs to the shelter
         $anak = Anak::where('id_shelter', $user->adminShelter->id_shelter)
                     ->findOrFail($id);
 
-        // Delete associated foto if exists
+        if ($anak->id_kelompok) {
+            $kelompok = \App\Models\Kelompok::find($anak->id_kelompok);
+            if ($kelompok) {
+                $kelompok->jumlah_anggota = $kelompok->anak()->where('id_anak', '!=', $id)->count();
+                $kelompok->save();
+            }
+        }
+
         if ($anak->foto) {
             Storage::disk('public')->delete("Anak/{$anak->id_anak}/{$anak->foto}");
         }
 
-        // Delete the anak record
         $anak->delete();
 
         return response()->json([
@@ -344,5 +323,4 @@ class AdminShelterAnakController extends Controller
             'message' => 'Anak berhasil dihapus'
         ], 200);
     }
-    
 }

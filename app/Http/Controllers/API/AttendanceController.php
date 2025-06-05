@@ -27,93 +27,108 @@ class AttendanceController extends Controller
         $this->verificationService = $verificationService;
     }
     
-    /**
-     * Record attendance with QR code verification
-     *
-     * @param  \App\Http\Requests\AttendanceRequest  $request
-     * @return \Illuminate\Http\Response
-     */
     public function recordAttendanceByQr(AttendanceRequest $request)
     {
-        $result = $this->attendanceService->recordAttendanceByQr(
-            $request->id_anak,
-            $request->id_aktivitas,
-            $request->status,
-            $request->token,
-            $request->arrival_time
-        );
-        
-        if (!$result['success']) {
-            // Check if it's a duplicate record
-            if (isset($result['duplicate']) && $result['duplicate']) {
+        try {
+            $aktivitas = Aktivitas::findOrFail($request->id_aktivitas);
+            $attendanceCheck = $aktivitas->canRecordAttendance();
+            
+            if (!$attendanceCheck['allowed']) {
                 return response()->json([
                     'success' => false,
-                    'message' => $result['message'],
-                    'data' => new AttendanceResource($result['absen'])
-                ], 409); // 409 Conflict is appropriate for duplicate resources
+                    'message' => $attendanceCheck['reason']
+                ], 422);
+            }
+            
+            $result = $this->attendanceService->recordAttendanceByQr(
+                $request->id_anak,
+                $request->id_aktivitas,
+                $request->status,
+                $request->token,
+                $request->arrival_time
+            );
+            
+            if (!$result['success']) {
+                if (isset($result['duplicate']) && $result['duplicate']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $result['message'],
+                        'data' => new AttendanceResource($result['absen'])
+                    ], 409);
+                }
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message']
+                ], 400);
             }
             
             return response()->json([
+                'success' => true,
+                'message' => 'Attendance recorded successfully',
+                'data' => new AttendanceResource($result['absen']),
+                'verification' => $result['verification']
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
                 'success' => false,
-                'message' => $result['message']
+                'message' => $e->getMessage()
             ], 400);
         }
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Attendance recorded successfully',
-            'data' => new AttendanceResource($result['absen']),
-            'verification' => $result['verification']
-        ]);
     }
     
-    /**
-     * Record attendance manually (by admin)
-     *
-     * @param  \App\Http\Requests\AttendanceRequest  $request
-     * @return \Illuminate\Http\Response
-     */
     public function recordAttendanceManually(AttendanceRequest $request)
     {
-        $result = $this->attendanceService->recordAttendanceManually(
-            $request->id_anak,
-            $request->id_aktivitas,
-            $request->status,
-            $request->notes,
-            $request->arrival_time
-        );
-        
-        if (!$result['success']) {
-            // Check if it's a duplicate record
-            if (isset($result['duplicate']) && $result['duplicate']) {
+        try {
+            $aktivitas = Aktivitas::findOrFail($request->id_aktivitas);
+            $attendanceCheck = $aktivitas->canRecordAttendance();
+            
+            if (!$attendanceCheck['allowed']) {
                 return response()->json([
                     'success' => false,
-                    'message' => $result['message'],
-                    'data' => new AttendanceResource($result['absen'])
-                ], 409); // 409 Conflict is appropriate for duplicate resources
+                    'message' => $attendanceCheck['reason']
+                ], 422);
+            }
+            
+            $result = $this->attendanceService->recordAttendanceManually(
+                $request->id_anak,
+                $request->id_aktivitas,
+                $request->status,
+                $request->notes,
+                $request->arrival_time
+            );
+            
+            if (!$result['success']) {
+                if (isset($result['duplicate']) && $result['duplicate']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $result['message'],
+                        'data' => new AttendanceResource($result['absen'])
+                    ], 409);
+                }
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message']
+                ], 400);
             }
             
             return response()->json([
+                'success' => true,
+                'message' => 'Attendance recorded manually',
+                'data' => new AttendanceResource($result['absen']),
+                'verification' => $result['verification']
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
                 'success' => false,
-                'message' => $result['message']
+                'message' => $e->getMessage()
             ], 400);
         }
-        
-        return response()->json([
-            'success' => true,
-            'message' => 'Attendance recorded manually',
-            'data' => new AttendanceResource($result['absen']),
-            'verification' => $result['verification']
-        ]);
     }
     
-    /**
-     * Get attendance records for an activity
-     *
-     * @param  int  $id_aktivitas
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
     public function getByActivity($id_aktivitas, Request $request)
     {
         $filters = $request->only(['is_verified', 'verification_status', 'status']);
@@ -133,13 +148,6 @@ class AttendanceController extends Controller
         }
     }
     
-    /**
-     * Get attendance records for a student
-     *
-     * @param  int  $id_anak
-     * @param  \App\Http\Requests\AttendanceRequest  $request
-     * @return \Illuminate\Http\Response
-     */
     public function getByStudent($id_anak, AttendanceRequest $request)
     {
         $filters = $request->only(['is_verified', 'verification_status', 'status', 'date_from', 'date_to']);
@@ -159,13 +167,6 @@ class AttendanceController extends Controller
         }
     }
     
-    /**
-     * Manually verify an attendance record
-     *
-     * @param  int  $id_absen
-     * @param  \App\Http\Requests\AttendanceRequest  $request
-     * @return \Illuminate\Http\Response
-     */
     public function manualVerify($id_absen, AttendanceRequest $request)
     {
         $result = $this->verificationService->verifyManually($id_absen, $request->notes);
@@ -184,13 +185,6 @@ class AttendanceController extends Controller
         ]);
     }
     
-    /**
-     * Reject an attendance verification
-     *
-     * @param  int  $id_absen
-     * @param  \App\Http\Requests\AttendanceRequest  $request
-     * @return \Illuminate\Http\Response
-     */
     public function rejectVerification($id_absen, AttendanceRequest $request)
     {
         $result = $this->verificationService->rejectVerification($id_absen, $request->reason);
@@ -209,12 +203,6 @@ class AttendanceController extends Controller
         ]);
     }
     
-    /**
-     * Get verification history for an attendance record
-     *
-     * @param  int  $id_absen
-     * @return \Illuminate\Http\Response
-     */
     public function getVerificationHistory($id_absen)
     {
         try {

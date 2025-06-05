@@ -10,9 +10,6 @@ use Illuminate\Http\Request;
 
 class DonaturPrestasiController extends Controller
 {
-    /**
-     * Get prestasi list for specific child
-     */
     public function index(Request $request, $childId)
     {
         try {
@@ -25,7 +22,6 @@ class DonaturPrestasiController extends Controller
                 ], 404);
             }
 
-            // Verify child belongs to this donatur
             $child = Anak::where('id_anak', $childId)
                 ->where('id_donatur', $donatur->id_donatur)
                 ->first();
@@ -40,13 +36,7 @@ class DonaturPrestasiController extends Controller
             $prestasiList = Prestasi::where('id_anak', $childId)
                 ->with('anak')
                 ->orderBy('tgl_upload', 'desc')
-                ->get()
-                ->map(function ($prestasi) {
-                    $prestasi->foto_url = $prestasi->foto ? 
-                        url("storage/Prestasi/{$prestasi->id_anak}/{$prestasi->foto}") : 
-                        null;
-                    return $prestasi;
-                });
+                ->get();
 
             return response()->json([
                 'success' => true,
@@ -62,9 +52,6 @@ class DonaturPrestasiController extends Controller
         }
     }
 
-    /**
-     * Get specific prestasi details
-     */
     public function show(Request $request, $childId, $prestasiId)
     {
         try {
@@ -77,7 +64,6 @@ class DonaturPrestasiController extends Controller
                 ], 404);
             }
 
-            // Verify child belongs to this donatur
             $child = Anak::where('id_anak', $childId)
                 ->where('id_donatur', $donatur->id_donatur)
                 ->first();
@@ -101,11 +87,6 @@ class DonaturPrestasiController extends Controller
                 ], 404);
             }
 
-            $prestasi->foto_url = $prestasi->foto ? 
-                url("storage/Prestasi/{$prestasi->id_anak}/{$prestasi->foto}") : 
-                null;
-
-            // Mark as read if not already read
             if (!$prestasi->is_read) {
                 $prestasi->update(['is_read' => true]);
             }
@@ -124,9 +105,6 @@ class DonaturPrestasiController extends Controller
         }
     }
 
-    /**
-     * Mark prestasi as read
-     */
     public function markAsRead(Request $request, $childId, $prestasiId)
     {
         try {
@@ -139,7 +117,6 @@ class DonaturPrestasiController extends Controller
                 ], 404);
             }
 
-            // Verify child belongs to this donatur
             $child = Anak::where('id_anak', $childId)
                 ->where('id_donatur', $donatur->id_donatur)
                 ->first();
