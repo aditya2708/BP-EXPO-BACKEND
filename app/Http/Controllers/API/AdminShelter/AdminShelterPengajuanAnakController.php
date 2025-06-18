@@ -75,7 +75,7 @@ class AdminShelterPengajuanAnakController extends Controller
     {
         // Validasi data yang diterima dari form
         $validator = Validator::make($request->all(), [
-            'no_kk' => 'required|string|max:20', // Pastikan nomor KK ada untuk mencari keluarga
+            'no_kk' => 'required|string|max:20',
             'jenjang' => 'required|string|in:belum_sd,sd,smp,sma,perguruan_tinggi',
             'kelas' => 'nullable|string|max:255',
             'nama_sekolah' => 'nullable|string|max:255',
@@ -94,7 +94,6 @@ class AdminShelterPengajuanAnakController extends Controller
             'tanggal_lahir' => 'required|date',
             'jenis_kelamin' => 'required|string|in:Laki-laki,Perempuan',
             'tinggal_bersama' => 'required|string|in:Ayah,Ibu,Wali',
-            'jenis_anak_binaan' => 'required|string|in:BPCB,NPB',
             'hafalan' => 'required|string|in:Tahfidz,Non-Tahfidz',
             'pelajaran_favorit' => 'nullable|string|max:255',
             'prestasi' => 'nullable|string|max:255',
@@ -152,23 +151,22 @@ class AdminShelterPengajuanAnakController extends Controller
                 'tanggal_lahir' => $request->tanggal_lahir,
                 'jenis_kelamin' => $request->jenis_kelamin,
                 'tinggal_bersama' => $request->tinggal_bersama,
-                'jenis_anak_binaan' => $request->jenis_anak_binaan,
                 'hafalan' => $request->hafalan,
                 'pelajaran_favorit' => $request->pelajaran_favorit,
                 'prestasi' => $request->prestasi,
                 'jarak_rumah' => $request->jarak_rumah,
                 'hobi' => $request->hobi,
                 'transportasi' => $request->transportasi,
-                'status_validasi' => 'non-aktif', // Set default status
+                'status_validasi' => 'aktif',
+                'status_cpb' => 'BCPB',
             ]);
             
             // Upload foto jika ada
             if ($request->hasFile('foto')) {
-                $folderPath = 'Anak/' . $anak->id_anak; // Path berdasarkan ID anak
-                $fileName = $request->file('foto')->getClientOriginalName(); // Nama asli file
-                $fotoPath = $request->file('foto')->storeAs($folderPath, $fileName, 'public'); // Simpan file
+                $folderPath = 'Anak/' . $anak->id_anak;
+                $fileName = $request->file('foto')->getClientOriginalName();
+                $fotoPath = $request->file('foto')->storeAs($folderPath, $fileName, 'public');
                 
-                // Simpan path relatif ke database
                 $anak->update(['foto' => $fileName]);
             }
             

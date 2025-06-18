@@ -11,6 +11,7 @@ use App\Models\Ibu;
 use App\Models\Kacab;
 use App\Models\Keluarga;
 use App\Models\Shelter;
+use App\Models\Survey;
 use App\Models\Wali;
 use App\Models\Wilbin;
 use Illuminate\Http\Request;
@@ -22,80 +23,10 @@ use Illuminate\Support\Str;
 
 class AdminShelterKeluargaController extends Controller
 {
-    /**
-     * Display a paginated listing of families
-     */
-   /**
- * Display a paginated listing of families
- */
-public function index(Request $request)
-{
-    // Get the authenticated admin_shelter
-    $user = Auth::user();
-    
-    // Ensure the user has an admin_shelter profile
-    if (!$user->adminShelter || !$user->adminShelter->shelter) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthorized access'
-        ], 403);
-    }
-    
-    // Get the shelter ID from the authenticated user
-    $shelterId = $user->adminShelter->id_shelter;
-    
-    $query = Keluarga::query();
-    
-    // Always filter by the admin's shelter ID
-    $query->where('id_shelter', $shelterId);
-
-    // Filter by search term (no_kk or kepala_keluarga)
-    if ($request->has('search')) {
-        $query->where(function($q) use ($request) {
-            $q->where('no_kk', 'like', '%' . $request->search . '%')
-              ->orWhere('kepala_keluarga', 'like', '%' . $request->search . '%');
-        });
-    }
-
-    // Filter by wilbin if requested
-    if ($request->has('id_wilbin')) {
-        $query->where('id_wilbin', $request->id_wilbin);
-    }
-
-    // Filter by kacab if requested
-    if ($request->has('id_kacab')) {
-        $query->where('id_kacab', $request->id_kacab);
-    }
-
-    // Get the paginated results with relationships
-    $keluarga = $query->with(['shelter', 'wilbin', 'kacab', 'bank'])
-                      ->latest()
-                      ->paginate($request->per_page ?? 10);
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Daftar Keluarga',
-        'data' => $keluarga->items(),
-        'pagination' => [
-            'total' => $keluarga->total(),
-            'per_page' => $keluarga->perPage(),
-            'current_page' => $keluarga->currentPage(),
-            'last_page' => $keluarga->lastPage(),
-            'from' => $keluarga->firstItem(),
-            'to' => $keluarga->lastItem()
-        ]
-    ], 200);
-}
-
-    /**
-     * Display the specified family details with all relationships
-     */
-    public function show($id)
+    public function index(Request $request)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter || !$user->adminShelter->shelter) {
             return response()->json([
                 'success' => false,
@@ -103,10 +34,59 @@ public function index(Request $request)
             ], 403);
         }
         
-        // Get the shelter ID from the authenticated user
+        $shelterId = $user->adminShelter->id_shelter;
+        
+        $query = Keluarga::query();
+        
+        $query->where('id_shelter', $shelterId);
+
+        if ($request->has('search')) {
+            $query->where(function($q) use ($request) {
+                $q->where('no_kk', 'like', '%' . $request->search . '%')
+                  ->orWhere('kepala_keluarga', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        if ($request->has('id_wilbin')) {
+            $query->where('id_wilbin', $request->id_wilbin);
+        }
+
+        if ($request->has('id_kacab')) {
+            $query->where('id_kacab', $request->id_kacab);
+        }
+
+        $keluarga = $query->with(['shelter', 'wilbin', 'kacab', 'bank'])
+                          ->latest()
+                          ->paginate($request->per_page ?? 10);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Daftar Keluarga',
+            'data' => $keluarga->items(),
+            'pagination' => [
+                'total' => $keluarga->total(),
+                'per_page' => $keluarga->perPage(),
+                'current_page' => $keluarga->currentPage(),
+                'last_page' => $keluarga->lastPage(),
+                'from' => $keluarga->firstItem(),
+                'to' => $keluarga->lastItem()
+            ]
+        ], 200);
+    }
+
+    public function show($id)
+    {
+        $user = Auth::user();
+        
+        if (!$user->adminShelter || !$user->adminShelter->shelter) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
         
         $shelterId = $user->adminShelter->id_shelter;
-        // Find the family and verify it belongs to the admin's shelter
+        
         $keluarga = Keluarga::where('id_shelter', $shelterId)
             ->with([
                 'shelter', 
@@ -116,15 +96,13 @@ public function index(Request $request)
                 'ayah',
                 'ibu',
                 'wali',
-                'surveys' // Include surveys if needed
+                'surveys'
             ])->findOrFail($id);
 
-        // Get all children in this family with their education details
         $anak = Anak::with('anakPendidikan')
                     ->where('id_keluarga', $id)
                     ->get();
 
-        // Combine all data
         $data = [
             'keluarga' => $keluarga,
             'anak' => $anak
@@ -137,15 +115,10 @@ public function index(Request $request)
         ], 200);
     }
 
-    /**
-     * Store a newly created family record with all related data
-     */
     public function store(Request $request)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter || !$user->adminShelter->shelter) {
             return response()->json([
                 'success' => false,
@@ -153,12 +126,9 @@ public function index(Request $request)
             ], 403);
         }
         
-        // Get the shelter ID from the authenticated user
         $shelterId = $user->adminShelter->id_shelter;
         
-        // Define validation rules
         $rules = [
-            // Keluarga validation
             'no_kk' => 'required|string|max:20',
             'kepala_keluarga' => 'required|string|max:255',
             'status_ortu' => 'required|string|in:yatim,piatu,yatim piatu,dhuafa,non dhuafa',
@@ -170,7 +140,6 @@ public function index(Request $request)
             'no_tlp' => 'nullable|string|max:255',
             'an_tlp' => 'nullable|string|max:255',
 
-            // AnakPendidikan validation
             'jenjang' => 'required|string|in:belum_sd,sd,smp,sma,perguruan_tinggi',
             'kelas' => 'nullable|string|max:255',
             'nama_sekolah' => 'nullable|string|max:255',
@@ -180,7 +149,6 @@ public function index(Request $request)
             'nama_pt' => 'nullable|string|max:255',
             'alamat_pt' => 'nullable|string|max:255',
 
-            // Anak validation
             'nik_anak' => 'required|string|max:16',
             'anak_ke' => 'required|integer',
             'dari_bersaudara' => 'required|integer',
@@ -191,7 +159,6 @@ public function index(Request $request)
             'tanggal_lahir' => 'required|date',
             'jenis_kelamin' => 'required|string|in:Laki-laki,Perempuan',
             'tinggal_bersama' => 'required|string|in:Ayah,Ibu,Wali',
-            'jenis_anak_binaan' => 'required|string|in:BPCB,NPB',
             'hafalan' => 'required|string|in:Tahfidz,Non-Tahfidz',
             'pelajaran_favorit' => 'nullable|string|max:255',
             'hobi' => 'nullable|string|max:255',
@@ -200,7 +167,6 @@ public function index(Request $request)
             'transportasi' => 'required|string',
             'foto' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
 
-            // Ayah validation
             'nik_ayah' => 'nullable|string|max:16',
             'nama_ayah' => 'nullable|string|max:255',
             'agama_ayah' => 'nullable|string|in:Islam,Kristen,Budha,Hindu,Konghucu',
@@ -215,7 +181,6 @@ public function index(Request $request)
             'tanggal_kematian_ayah' => 'nullable|date',
             'penyebab_kematian_ayah' => 'nullable|string|max:255',
 
-            // Ibu validation
             'nik_ibu' => 'nullable|string|max:16',
             'nama_ibu' => 'nullable|string|max:255',
             'agama_ibu' => 'nullable|string|in:Islam,Kristen,Budha,Hindu,Konghucu',
@@ -230,7 +195,6 @@ public function index(Request $request)
             'tanggal_kematian_ibu' => 'nullable|date',
             'penyebab_kematian_ibu' => 'nullable|string|max:255',
 
-            // Wali validation
             'nik_wali' => 'nullable|string|max:16',
             'nama_wali' => 'nullable|string|max:255',
             'agama_wali' => 'nullable|string|in:Islam,Kristen,Budha,Hindu,Konghucu',
@@ -242,15 +206,42 @@ public function index(Request $request)
             'id_kec_wali' => 'nullable|string|max:6',
             'id_kel_wali' => 'nullable|string|max:10',
             'penghasilan_wali' => 'nullable|string',
-            'hub_kerabat_wali' => 'nullable|string'
+            'hub_kerabat_wali' => 'nullable|string',
 
-            
+            'pekerjaan_kepala_keluarga' => 'required|string|max:255',
+            'penghasilan' => 'required|string|max:255',
+            'pendidikan_kepala_keluarga' => 'required|string|max:255',
+            'jumlah_tanggungan' => 'required|integer',
+            'kepemilikan_tabungan' => 'required|string|in:Ada,Tidak Ada',
+            'jumlah_makan' => 'required|integer',
+            'kepemilikan_tanah' => 'required|string|in:Milik Sendiri,Kontrak,Menumpang,Lainnya',
+            'kepemilikan_rumah' => 'required|string|in:Milik Sendiri,Kontrak,Menumpang,Lainnya',
+            'kondisi_rumah_dinding' => 'required|string|max:255',
+            'kondisi_rumah_lantai' => 'required|string|max:255',
+            'kepemilikan_kendaraan' => 'required|string|max:255',
+            'kepemilikan_elektronik' => 'required|string|max:255',
+            'sumber_air_bersih' => 'required|string|max:255',
+            'jamban_limbah' => 'required|string|max:255',
+            'tempat_sampah' => 'required|string|max:255',
+            'perokok' => 'required|string|in:Ya,Tidak',
+            'konsumen_miras' => 'required|string|in:Ya,Tidak',
+            'persediaan_p3k' => 'required|string|in:Ada,Tidak Ada',
+            'makan_buah_sayur' => 'required|string|in:Selalu,Kadang-kadang,Tidak Pernah',
+            'solat_lima_waktu' => 'required|string|in:Selalu,Kadang-kadang,Tidak Pernah',
+            'membaca_alquran' => 'required|string|in:Selalu,Kadang-kadang,Tidak Pernah',
+            'majelis_taklim' => 'required|string|in:Aktif,Tidak Aktif',
+            'membaca_koran' => 'required|string|in:Selalu,Kadang-kadang,Tidak Pernah',
+            'pengurus_organisasi' => 'required|string|in:Ya,Tidak',
+            'pengurus_organisasi_sebagai' => 'nullable|string|max:255',
+            'status_anak' => 'required|string|max:255',
+            'biaya_pendidikan_perbulan' => 'required|numeric',
+            'bantuan_lembaga_formal_lain' => 'required|string|in:Ya,Tidak',
+            'bantuan_lembaga_formal_lain_sebesar' => 'nullable|numeric',
+            'kondisi_penerima_manfaat' => 'required|string|max:255'
         ];
         
-        // Create validator instance
         $validator = Validator::make($request->all(), $rules);
         
-        // Check if validation fails
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
@@ -259,11 +250,9 @@ public function index(Request $request)
             ], 422);
         }
 
-        // Start transaction
         DB::beginTransaction();
         
         try {
-            // Handle bank account and phone options
             if ($request->has('bank_choice') && $request->bank_choice == 'no') {
                 $request->merge([
                     'id_bank' => null,
@@ -279,14 +268,13 @@ public function index(Request $request)
                 ]);
             }
             
-            // 1. Create Family (Keluarga)
             $keluarga = Keluarga::create([
                 'no_kk' => $request->no_kk,
                 'kepala_keluarga' => $request->kepala_keluarga,
                 'status_ortu' => $request->status_ortu,
                 'id_kacab' => $request->id_kacab,
                 'id_wilbin' => $request->id_wilbin,
-                'id_shelter' => $shelterId, // Use the shelter ID from the authenticated user
+                'id_shelter' => $shelterId,
                 'id_bank' => $request->id_bank,
                 'no_rek' => $request->no_rek,
                 'an_rek' => $request->an_rek,
@@ -294,7 +282,6 @@ public function index(Request $request)
                 'an_tlp' => $request->an_tlp,
             ]);
             
-            // 2. Create Ayah (Father)
             $ayah = Ayah::create([
                 'id_keluarga' => $keluarga->id_keluarga,
                 'nik_ayah' => $request->nik_ayah,
@@ -312,7 +299,6 @@ public function index(Request $request)
                 'penyebab_kematian' => $request->penyebab_kematian_ayah,
             ]);
             
-            // 3. Create Ibu (Mother)
             $ibu = Ibu::create([
                 'id_keluarga' => $keluarga->id_keluarga,
                 'nik_ibu' => $request->nik_ibu,
@@ -330,7 +316,6 @@ public function index(Request $request)
                 'penyebab_kematian' => $request->penyebab_kematian_ibu,
             ]);
             
-            // 4. Create Wali (Guardian)
             $wali = Wali::create([
                 'id_keluarga' => $keluarga->id_keluarga,
                 'nik_wali' => $request->nik_wali,
@@ -347,7 +332,6 @@ public function index(Request $request)
                 'hub_kerabat' => $request->hub_kerabat_wali,
             ]);
             
-            // 5. Create Anak Pendidikan (Child Education)
             $pendidikan = AnakPendidikan::create([
                 'id_keluarga' => $keluarga->id_keluarga,
                 'jenjang' => $request->jenjang,
@@ -359,12 +343,49 @@ public function index(Request $request)
                 'nama_pt' => $request->nama_pt,
                 'alamat_pt' => $request->alamat_pt,
             ]);
+
+            $survey = Survey::create([
+                'id_keluarga' => $keluarga->id_keluarga,
+                'pekerjaan_kepala_keluarga' => $request->pekerjaan_kepala_keluarga,
+                'penghasilan' => $request->penghasilan,
+                'pendidikan_kepala_keluarga' => $request->pendidikan_kepala_keluarga,
+                'jumlah_tanggungan' => $request->jumlah_tanggungan,
+                'kepemilikan_tabungan' => $request->kepemilikan_tabungan,
+                'jumlah_makan' => $request->jumlah_makan,
+                'kepemilikan_tanah' => $request->kepemilikan_tanah,
+                'kepemilikan_rumah' => $request->kepemilikan_rumah,
+                'kondisi_rumah_dinding' => $request->kondisi_rumah_dinding,
+                'kondisi_rumah_lantai' => $request->kondisi_rumah_lantai,
+                'kepemilikan_kendaraan' => $request->kepemilikan_kendaraan,
+                'kepemilikan_elektronik' => $request->kepemilikan_elektronik,
+                'sumber_air_bersih' => $request->sumber_air_bersih,
+                'jamban_limbah' => $request->jamban_limbah,
+                'tempat_sampah' => $request->tempat_sampah,
+                'perokok' => $request->perokok,
+                'konsumen_miras' => $request->konsumen_miras,
+                'persediaan_p3k' => $request->persediaan_p3k,
+                'makan_buah_sayur' => $request->makan_buah_sayur,
+                'solat_lima_waktu' => $request->solat_lima_waktu,
+                'membaca_alquran' => $request->membaca_alquran,
+                'majelis_taklim' => $request->majelis_taklim,
+                'membaca_koran' => $request->membaca_koran,
+                'pengurus_organisasi' => $request->pengurus_organisasi,
+                'pengurus_organisasi_sebagai' => $request->pengurus_organisasi_sebagai,
+                'status_anak' => $request->status_anak,
+                'biaya_pendidikan_perbulan' => $request->biaya_pendidikan_perbulan,
+                'bantuan_lembaga_formal_lain' => $request->bantuan_lembaga_formal_lain,
+                'bantuan_lembaga_formal_lain_sebesar' => $request->bantuan_lembaga_formal_lain_sebesar,
+                'kondisi_penerima_manfaat' => $request->kondisi_penerima_manfaat,
+                'tanggal_survey' => now(),
+                'petugas_survey' => $user->name,
+                'hasil_survey' => 'pending',
+                'keterangan_hasil' => 'Menunggu persetujuan admin cabang'
+            ]);
             
-            // 6. Create Anak (Child)
             $anak = Anak::create([
                 'id_keluarga' => $keluarga->id_keluarga,
                 'id_anak_pend' => $pendidikan->id_anak_pend,
-                'id_shelter' => $shelterId, // Use the shelter ID from the authenticated user
+                'id_shelter' => $shelterId,
                 'nik_anak' => $request->nik_anak,
                 'anak_ke' => $request->anak_ke,
                 'dari_bersaudara' => $request->dari_bersaudara,
@@ -375,41 +396,37 @@ public function index(Request $request)
                 'tanggal_lahir' => $request->tanggal_lahir,
                 'jenis_kelamin' => $request->jenis_kelamin,
                 'tinggal_bersama' => $request->tinggal_bersama,
-                'jenis_anak_binaan' => $request->jenis_anak_binaan,
                 'hafalan' => $request->hafalan,
                 'pelajaran_favorit' => $request->pelajaran_favorit,
                 'hobi' => $request->hobi,
                 'prestasi' => $request->prestasi,
                 'jarak_rumah' => $request->jarak_rumah,
                 'transportasi' => $request->transportasi,
-                'status_validasi' => 'non-aktif', // Default status
+                'status_validasi' => 'aktif',
+                'status_cpb' => 'BCPB',
             ]);
             
-            // Upload foto if present
             if ($request->hasFile('foto')) {
                 $folderPath = 'Anak/' . $anak->id_anak;
                 $fileName = $request->file('foto')->getClientOriginalName();
                 $request->file('foto')->storeAs($folderPath, $fileName, 'public');
                 
-                // Update anak with photo filename
                 $anak->update(['foto' => $fileName]);
             }
             
-            // Commit transaction
             DB::commit();
             
-            // Return success response
             return response()->json([
                 'success' => true,
                 'message' => 'Keluarga dan Anak berhasil ditambahkan',
                 'data' => [
                     'keluarga' => $keluarga,
-                    'anak' => $anak
+                    'anak' => $anak,
+                    'survey' => $survey
                 ]
             ], 201);
             
         } catch (\Exception $e) {
-            // Rollback transaction on error
             DB::rollBack();
             
             return response()->json([
@@ -421,15 +438,10 @@ public function index(Request $request)
         }
     }
 
-    /**
-     * Update the specified family and related records
-     */
     public function update(Request $request, $id)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter || !$user->adminShelter->shelter) {
             return response()->json([
                 'success' => false,
@@ -437,15 +449,11 @@ public function index(Request $request)
             ], 403);
         }
         
-        // Get the shelter ID from the authenticated user
         $shelterId = $user->adminShelter->id_shelter;
         
-        // Find the family record and verify it belongs to the admin's shelter
         $keluarga = Keluarga::where('id_shelter', $shelterId)->findOrFail($id);
         
-        // Define validation rules (similar to store but with conditional requirements)
         $rules = [
-            // Keluarga validation
             'no_kk' => 'sometimes|required|string|max:20',
             'kepala_keluarga' => 'sometimes|required|string|max:255',
             'status_ortu' => 'sometimes|required|string|in:yatim,piatu,yatim piatu,dhuafa,non dhuafa',
@@ -456,15 +464,10 @@ public function index(Request $request)
             'an_rek' => 'nullable|string|max:255',
             'no_tlp' => 'nullable|string|max:255',
             'an_tlp' => 'nullable|string|max:255',
-            
-            // Other validation rules similar to store method but with 'sometimes'
-            // These would be included for full validation
         ];
         
-        // Create validator instance for family data
         $validator = Validator::make($request->all(), $rules);
         
-        // Check if validation fails
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
@@ -473,21 +476,17 @@ public function index(Request $request)
             ], 422);
         }
 
-        // Start transaction
         DB::beginTransaction();
         
         try {
-            // Prepare data for update, removing id_shelter to prevent it from being changed
             $updateData = $request->only([
                 'no_kk', 'kepala_keluarga', 'status_ortu', 'id_kacab', 
                 'id_wilbin', 'id_bank', 'no_rek', 
                 'an_rek', 'no_tlp', 'an_tlp'
             ]);
             
-            // Update Keluarga data (don't allow changing shelter)
             $keluarga->update($updateData);
             
-            // Update Ayah (if provided)
             if ($request->has('nik_ayah') || $request->has('nama_ayah')) {
                 $ayah = Ayah::where('id_keluarga', $id)->first();
                 if ($ayah) {
@@ -509,7 +508,6 @@ public function index(Request $request)
                 }
             }
             
-            // Update Ibu (if provided)
             if ($request->has('nik_ibu') || $request->has('nama_ibu')) {
                 $ibu = Ibu::where('id_keluarga', $id)->first();
                 if ($ibu) {
@@ -531,7 +529,6 @@ public function index(Request $request)
                 }
             }
             
-            // Update Wali (if provided)
             if ($request->has('nik_wali') || $request->has('nama_wali')) {
                 $wali = Wali::where('id_keluarga', $id)->first();
                 if ($wali) {
@@ -552,17 +549,11 @@ public function index(Request $request)
                 }
             }
             
-            // We don't update the child info here as this endpoint is just for family data
-            // Child updates would be handled by a separate endpoint
-            
-            // Commit transaction
             DB::commit();
             
-            // Get updated family data with relationships
             $updatedKeluarga = Keluarga::with(['ayah', 'ibu', 'wali', 'kacab', 'wilbin', 'shelter', 'bank'])
                                       ->findOrFail($id);
             
-            // Return success response
             return response()->json([
                 'success' => true,
                 'message' => 'Data keluarga berhasil diperbarui',
@@ -570,7 +561,6 @@ public function index(Request $request)
             ], 200);
             
         } catch (\Exception $e) {
-            // Rollback transaction on error
             DB::rollBack();
             
             return response()->json([
@@ -580,15 +570,10 @@ public function index(Request $request)
         }
     }
 
-    /**
-     * Remove the specified family
-     */
     public function destroy($id)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter || !$user->adminShelter->shelter) {
             return response()->json([
                 'success' => false,
@@ -596,19 +581,15 @@ public function index(Request $request)
             ], 403);
         }
         
-        // Get the shelter ID from the authenticated user
         $shelterId = $user->adminShelter->id_shelter;
         
-        // Find the family and verify it belongs to the admin's shelter
         $keluarga = Keluarga::where('id_shelter', $shelterId)->findOrFail($id);
         
         try {
             DB::beginTransaction();
             
-            // First find children to delete their photos
             $anak = Anak::where('id_keluarga', $id)->get();
             
-            // Delete child photos from storage
             foreach ($anak as $child) {
                 if ($child->foto) {
                     $folderPath = 'Anak/' . $child->id_anak;
@@ -616,7 +597,6 @@ public function index(Request $request)
                 }
             }
             
-            // Now delete the family record (which should cascade to related records)
             $keluarga->delete();
             
             DB::commit();
@@ -636,9 +616,6 @@ public function index(Request $request)
         }
     }
     
-    /**
-     * Get dropdown data for forms
-     */
     public function getDropdownData()
     {
         try {
@@ -659,9 +636,6 @@ public function index(Request $request)
         } 
     }
     
-    /**
-     * Get wilbin options based on kacab selection
-     */
     public function getWilbinByKacab(Request $request, $id_kacab)
     {
         try {
@@ -680,15 +654,10 @@ public function index(Request $request)
         }
     }
     
-    /**
-     * Get shelter options based on wilbin selection
-     */
     public function getShelterByWilbin(Request $request, $id_wilbin)
     {
-        // Get the authenticated admin_shelter
         $user = Auth::user();
         
-        // Ensure the user has an admin_shelter profile
         if (!$user->adminShelter || !$user->adminShelter->shelter) {
             return response()->json([
                 'success' => false,
@@ -696,11 +665,9 @@ public function index(Request $request)
             ], 403);
         }
         
-        // Get the shelter ID from the authenticated user
         $shelterId = $user->adminShelter->id_shelter;
         
         try {
-            // Only return shelters from the same wilbin that match the admin's shelter
             $shelter = Shelter::where('id_wilbin', $id_wilbin)
                               ->where('id_shelter', $shelterId)
                               ->get(['id_shelter', 'nama_shelter']);

@@ -157,9 +157,20 @@ class AdminShelterAnakController extends Controller
             'hafalan' => 'required|in:Tahfidz,Non-Tahfidz',
             'status_validasi' => 'nullable|in:aktif,non-aktif,Ditolak,Ditangguhkan',
             'foto' => 'nullable|image|max:2048',
+            'background_story' => 'nullable|string',
+            'educational_goals' => 'nullable|string',
+            'personality_traits' => 'nullable|string',
+            'special_needs' => 'nullable|string',
+            'marketplace_featured' => 'nullable|boolean',
         ]);
 
         $validatedData['id_shelter'] = $user->adminShelter->id_shelter;
+
+        if (isset($validatedData['personality_traits'])) {
+            $validatedData['personality_traits'] = $validatedData['personality_traits'] 
+                ? explode(',', $validatedData['personality_traits']) 
+                : null;
+        }
 
         if (isset($validatedData['id_kelompok'])) {
             $kelompok = \App\Models\Kelompok::findOrFail($validatedData['id_kelompok']);
@@ -170,9 +181,7 @@ class AdminShelterAnakController extends Controller
 
         $anak->status_validasi = $validatedData['status_validasi'] ?? 'non-aktif';
 
-        $anak->status_cpb = $validatedData['jenis_anak_binaan'] === 'BPCB' 
-            ? Anak::STATUS_CPB_BCPB 
-            : Anak::STATUS_CPB_NPB;
+        $anak->status_cpb = Anak::STATUS_CPB_BCPB;
 
         $anak->save();
 
@@ -223,7 +232,18 @@ class AdminShelterAnakController extends Controller
             'hafalan' => 'sometimes|in:Tahfidz,Non-Tahfidz',
             'status_validasi' => 'sometimes|in:aktif,non-aktif,Ditolak,Ditangguhkan',
             'foto' => 'nullable|image|max:2048',
+            'background_story' => 'nullable|string',
+            'educational_goals' => 'nullable|string',
+            'personality_traits' => 'nullable|string',
+            'special_needs' => 'nullable|string',
+            'marketplace_featured' => 'nullable|boolean',
         ]);
+
+        if (isset($validatedData['personality_traits'])) {
+            $validatedData['personality_traits'] = $validatedData['personality_traits'] 
+                ? explode(',', $validatedData['personality_traits']) 
+                : null;
+        }
 
         if (isset($validatedData['id_kelompok'])) {
             if ($validatedData['id_kelompok'] === null) {
