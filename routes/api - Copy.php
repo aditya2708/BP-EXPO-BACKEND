@@ -1,31 +1,39 @@
 <?php
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
+// Public authentication endpoints
 Route::post('/auth/login', [App\Http\Controllers\API\AuthController::class, 'login']);
-
+// Protected routes
 Route::middleware('auth:sanctum')->group(function () {
+    // Shared authentication endpoints
     Route::post('/auth/logout', [App\Http\Controllers\API\AuthController::class, 'logout']);
     Route::get('/auth/user', [App\Http\Controllers\API\AuthController::class, 'user']);
     
+    // Admin Pusat routes
     Route::middleware('role:admin_pusat')->prefix('admin-pusat')->group(function () {
         Route::get('/dashboard', [App\Http\Controllers\API\AdminPusatController::class, 'dashboard']);
+        // Add more admin pusat routes here
 
+    // Admin Pusat Anak Management Routes
     Route::get('/anak', [AdminPusatAnakController::class, 'index']);
     Route::get('/anak/{id}', [AdminPusatAnakController::class, 'show']);
     Route::post('/anak/{id}', [AdminPusatAnakController::class, 'update']);
     Route::post('/anak/{id}/toggle-status', [AdminPusatAnakController::class, 'toggleStatus']);
     Route::get('/anak-summary', [AdminPusatAnakController::class, 'getSummary']);
 
-     Route::get('/anak/{childId}/raport', [AdminPusatRaportController::class, 'index']);
+     // Raport routes
+    Route::get('/anak/{childId}/raport', [AdminPusatRaportController::class, 'index']);
     Route::get('/anak/{childId}/raport/{raportId}', [AdminPusatRaportController::class, 'show']);
     
+    // Prestasi routes
     Route::get('/anak/{anakId}/prestasi', [AdminPusatPrestasiController::class, 'index']);
     Route::get('/anak/{anakId}/prestasi/{prestasiId}', [AdminPusatPrestasiController::class, 'show']);
     
+    // Riwayat routes
     Route::get('/anak/{anakId}/riwayat', [AdminPusatRiwayatController::class, 'index']);
     Route::get('/anak/{anakId}/riwayat/{riwayatId}', [AdminPusatRiwayatController::class, 'show']);
     
+    // Admin Pusat Keluarga Management Routes
 Route::get('/keluarga', [App\Http\Controllers\API\AdminPusat\AdminPusatKeluargaController::class, 'index']);
 Route::post('/keluarga', [App\Http\Controllers\API\AdminPusat\AdminPusatKeluargaController::class, 'store']);
 Route::get('/keluarga/{id}', [App\Http\Controllers\API\AdminPusat\AdminPusatKeluargaController::class, 'show']);
@@ -37,6 +45,7 @@ Route::get('/keluarga-shelter/{id_wilbin}', [App\Http\Controllers\API\AdminPusat
     
 });
     
+    // Admin Cabang routes
 Route::middleware('role:admin_cabang')->prefix('admin-cabang')->group(function () {
     Route::get('/dashboard', [App\Http\Controllers\API\AdminCabangController::class, 'dashboard']);
     
@@ -47,10 +56,10 @@ Route::middleware('role:admin_cabang')->prefix('admin-cabang')->group(function (
     Route::post('/survey-approval/{id}/reject', [App\Http\Controllers\API\AdminCabang\AdminCabangSurveyController::class, 'reject']);
 });
     
+    // Admin Shelter routes
     Route::middleware('role:admin_shelter')->prefix('admin-shelter')->group(function () {
         Route::get('/dashboard', [App\Http\Controllers\API\AdminShelterController::class, 'dashboard']);
-         Route::get('/profile', [App\Http\Controllers\API\AdminShelterController::class, 'getProfile']);
-    Route::post('/profile', [App\Http\Controllers\API\AdminShelterController::class, 'updateProfile']);
+        
     
         Route::get('/anak', [App\Http\Controllers\API\AdminShelter\AdminShelterAnakController::class, 'index']);
         Route::post('/anak', [App\Http\Controllers\API\AdminShelter\AdminShelterAnakController::class, 'store']);
@@ -90,15 +99,8 @@ Route::middleware('role:admin_cabang')->prefix('admin-cabang')->group(function (
         Route::post('/tutor/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterTutorController::class, 'update']);
         Route::delete('/tutor/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterTutorController::class, 'destroy']);
 
-        Route::get('/jenis-kompetensi', [App\Http\Controllers\API\AdminShelter\TutorCompetencyController::class, 'getJenisKompetensi']);
-
-        Route::get('/tutor/{tutorId}/competency', [App\Http\Controllers\API\AdminShelter\TutorCompetencyController::class, 'index']);
-        Route::post('/tutor/{tutorId}/competency', [App\Http\Controllers\API\AdminShelter\TutorCompetencyController::class, 'store']);
-        Route::get('/tutor/{tutorId}/competency/{id}', [App\Http\Controllers\API\AdminShelter\TutorCompetencyController::class, 'show']);
-        Route::post('/tutor/{tutorId}/competency/{id}', [App\Http\Controllers\API\AdminShelter\TutorCompetencyController::class, 'update']);
-        Route::delete('/tutor/{tutorId}/competency/{id}', [App\Http\Controllers\API\AdminShelter\TutorCompetencyController::class, 'destroy']);
-       
-Route::get('/kelompok', [App\Http\Controllers\API\AdminShelter\AdminShelterKelompokController::class, 'index']);
+        // Kelompok (Group) Management Routes
+        Route::get('/kelompok', [App\Http\Controllers\API\AdminShelter\AdminShelterKelompokController::class, 'index']);
         Route::post('/kelompok', [App\Http\Controllers\API\AdminShelter\AdminShelterKelompokController::class, 'store']);
         Route::get('/kelompok/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterKelompokController::class, 'show']);
         Route::post('/kelompok/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterKelompokController::class, 'update']);
@@ -110,6 +112,7 @@ Route::get('/kelompok', [App\Http\Controllers\API\AdminShelter\AdminShelterKelom
         Route::delete('/kelompok/{id_kelompok}/remove-child/{id_anak}', [App\Http\Controllers\API\AdminShelter\AdminShelterKelompokController::class, 'removeChildFromGroup']);
         Route::post('/move-child/{id_anak}', [App\Http\Controllers\API\AdminShelter\AdminShelterKelompokController::class, 'moveChildToShelter']);
 
+        // Keluarga (Family) Management Routes
         Route::get('/keluarga', [App\Http\Controllers\API\AdminShelter\AdminShelterKeluargaController::class, 'index']);
         Route::post('/keluarga', [App\Http\Controllers\API\AdminShelter\AdminShelterKeluargaController::class, 'store']);
         Route::get('/keluarga/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterKeluargaController::class, 'show']);
@@ -118,9 +121,11 @@ Route::get('/kelompok', [App\Http\Controllers\API\AdminShelter\AdminShelterKelom
         Route::get('/keluarga-dropdown', [App\Http\Controllers\API\AdminShelter\AdminShelterKeluargaController::class, 'getDropdownData']);
         Route::get('/keluarga-wilbin/{id_kacab}', [App\Http\Controllers\API\AdminShelter\AdminShelterKeluargaController::class, 'getWilbinByKacab']);
         Route::get('/keluarga-shelter/{id_wilbin}', [App\Http\Controllers\API\AdminShelter\AdminShelterKeluargaController::class, 'getShelterByWilbin']);
+        // Pengajuan Anak (Child Application) Routes
         Route::get('/pengajuan-anak/search-keluarga', [App\Http\Controllers\API\AdminShelter\AdminShelterPengajuanAnakController::class, 'searchKeluarga']);
         Route::post('/pengajuan-anak/validate-kk', [App\Http\Controllers\API\AdminShelter\AdminShelterPengajuanAnakController::class, 'validateKK']);
         Route::post('/pengajuan-anak/submit', [App\Http\Controllers\API\AdminShelter\AdminShelterPengajuanAnakController::class, 'submitAnak']);
+        // Add Survey routes here
        
     
         Route::get('/aktivitas', [App\Http\Controllers\API\AdminShelter\AktivitasController::class, 'index']);
@@ -129,6 +134,7 @@ Route::get('/aktivitas/{id}', [App\Http\Controllers\API\AdminShelter\AktivitasCo
 Route::post('/aktivitas/{id}', [App\Http\Controllers\API\AdminShelter\AktivitasController::class, 'update']);
 Route::delete('/aktivitas/{id}', [App\Http\Controllers\API\AdminShelter\AktivitasController::class, 'destroy']);
     
+        // QR Token routes
     Route::prefix('qr-tokens')->group(function () {
         Route::post('/generate', [App\Http\Controllers\API\QrTokenController::class, 'generate']);
         Route::post('/generate-batch', [App\Http\Controllers\API\QrTokenController::class, 'generateBatch']);
@@ -137,6 +143,7 @@ Route::delete('/aktivitas/{id}', [App\Http\Controllers\API\AdminShelter\Aktivita
         Route::post('/invalidate', [App\Http\Controllers\API\QrTokenController::class, 'invalidate']);
     });
     
+    // Attendance routes
     Route::prefix('attendance')->group(function () {
         Route::post('/record-by-qr', [App\Http\Controllers\API\AttendanceController::class, 'recordAttendanceByQr']);
         Route::post('/record-manual', [App\Http\Controllers\API\AttendanceController::class, 'recordAttendanceManually']);
@@ -147,6 +154,7 @@ Route::delete('/aktivitas/{id}', [App\Http\Controllers\API\AdminShelter\Aktivita
         Route::get('/{id_absen}/verification-history', [App\Http\Controllers\API\AttendanceController::class, 'getVerificationHistory']);
     });
 
+       // Tutor attendance routes
 Route::prefix('tutor-attendance')->group(function () {
     Route::post('/generate-token', [App\Http\Controllers\API\TutorAttendanceController::class, 'generateTutorToken']);
     Route::post('/record-by-qr', [App\Http\Controllers\API\TutorAttendanceController::class, 'recordTutorAttendanceByQr']);
@@ -155,19 +163,8 @@ Route::prefix('tutor-attendance')->group(function () {
     Route::get('/tutor/{id_tutor}', [App\Http\Controllers\API\TutorAttendanceController::class, 'getTutorAttendanceHistory']);
     Route::post('/validate-tutor-token', [App\Http\Controllers\API\TutorAttendanceController::class, 'validateTutorToken']);
 });
-
-Route::prefix('tutor-honor')->group(function () {
-    Route::get('/tutor/{id_tutor}', [App\Http\Controllers\API\AdminShelter\TutorHonorController::class, 'getTutorHonor']);
-    Route::get('/tutor/{id_tutor}/history', [App\Http\Controllers\API\AdminShelter\TutorHonorController::class, 'getHonorHistory']);
-    Route::get('/tutor/{id_tutor}/statistics', [App\Http\Controllers\API\AdminShelter\TutorHonorController::class, 'getHonorStatistics']);
-    Route::get('/tutor/{id_tutor}/month/{month}/year/{year}', [App\Http\Controllers\API\AdminShelter\TutorHonorController::class, 'getMonthlyDetail']);
-    Route::get('/tutor/{id_tutor}/year-range', [TutorHonorController::class, 'getYearRange']);
-    Route::post('/calculate/{id_tutor}', [App\Http\Controllers\API\AdminShelter\TutorHonorController::class, 'calculateHonor']);
-    Route::post('/approve/{id_honor}', [App\Http\Controllers\API\AdminShelter\TutorHonorController::class, 'approveHonor']);
-    Route::post('/mark-paid/{id_honor}', [App\Http\Controllers\API\AdminShelter\TutorHonorController::class, 'markAsPaid']);
-    Route::get('/stats', [App\Http\Controllers\API\AdminShelter\TutorHonorController::class, 'getHonorStats']);
-});
     
+    // Attendance Report routes
     Route::prefix('attendance-reports')->group(function () {
         Route::post('/statistics', [App\Http\Controllers\API\AttendanceReportController::class, 'generateStats']);
         Route::post('/tutor-payment', [App\Http\Controllers\API\AttendanceReportController::class, 'generateTutorPaymentReport']);
@@ -176,6 +173,7 @@ Route::prefix('tutor-honor')->group(function () {
 
 Route::get('/materi/by-level', [App\Http\Controllers\API\AdminShelter\MateriController::class, 'getByLevel']);
 
+// Route spesifik dulu
 Route::get('/semester/active', [App\Http\Controllers\API\AdminShelter\SemesterController::class, 'getActive']);
 Route::get('/semester/tahun-ajaran', [App\Http\Controllers\API\AdminShelter\SemesterController::class, 'getTahunAjaran']);
 Route::get('/semester/{id}/statistics', [App\Http\Controllers\API\AdminShelter\SemesterController::class, 'statistics']);
@@ -186,8 +184,10 @@ Route::get('/semester/{id}', [App\Http\Controllers\API\AdminShelter\SemesterCont
 Route::put('/semester/{id}', [App\Http\Controllers\API\AdminShelter\SemesterController::class, 'update']);
 Route::delete('/semester/{id}', [App\Http\Controllers\API\AdminShelter\SemesterController::class, 'destroy']);
 
+// Jenis Penilaian route
 Route::get('/jenis-penilaian', [App\Http\Controllers\API\AdminShelter\PenilaianController::class, 'getJenisPenilaian']);
 
+// Penilaian routes
 Route::get('/penilaian', [App\Http\Controllers\API\AdminShelter\PenilaianController::class, 'index']);
 Route::post('/penilaian', [App\Http\Controllers\API\AdminShelter\PenilaianController::class, 'store']);
 Route::get('/penilaian/{id}', [App\Http\Controllers\API\AdminShelter\PenilaianController::class, 'show']);
@@ -197,10 +197,12 @@ Route::get('/penilaian/anak/{idAnak}/semester/{idSemester}', [App\Http\Controlle
 Route::post('/penilaian/bulk', [App\Http\Controllers\API\AdminShelter\PenilaianController::class, 'bulkStore']);
 Route::post('/penilaian/calculate-nilai-akhir', [App\Http\Controllers\API\AdminShelter\PenilaianController::class, 'calculateNilaiAkhir']);
 
+// Nilai Sikap routes
 Route::get('/nilai-sikap/{idAnak}/{idSemester}', [App\Http\Controllers\API\AdminShelter\RaportController::class, 'getNilaiSikap']);
 Route::post('/nilai-sikap', [App\Http\Controllers\API\AdminShelter\RaportController::class, 'storeNilaiSikap']);
 Route::put('/nilai-sikap/{id}', [App\Http\Controllers\API\AdminShelter\RaportController::class, 'updateNilaiSikap']);
 
+// Raport routes
 Route::get('/raport', [App\Http\Controllers\API\AdminShelter\RaportController::class, 'index']);
 Route::post('/raport/generate', [App\Http\Controllers\API\AdminShelter\RaportController::class, 'generate']);
 Route::get('/raport/{id}', [App\Http\Controllers\API\AdminShelter\RaportController::class, 'show']);
@@ -213,6 +215,8 @@ Route::get('/raport/preview/{idAnak}/{idSemester}', [App\Http\Controllers\API\Ad
 Route::put('/raport/{idRaport}/detail/{idDetail}', [App\Http\Controllers\API\AdminShelter\RaportController::class, 'updateDetail']);
 Route::get('/raport/check-existing/{idAnak}/{idSemester}', [App\Http\Controllers\API\AdminShelter\RaportController::class, 'checkExistingRaport']);
 
+
+  // Raport Formal routes
     Route::get('anak/{anakId}/raport-formal', [App\Http\Controllers\API\AdminShelter\AdminShelterRaportFormalController::class, 'index']);
     Route::post('anak/{anakId}/raport-formal', [App\Http\Controllers\API\AdminShelter\AdminShelterRaportFormalController::class, 'store']);
     Route::get('anak/{anakId}/raport-formal/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterRaportFormalController::class, 'show']);
@@ -220,42 +224,41 @@ Route::get('/raport/check-existing/{idAnak}/{idSemester}', [App\Http\Controllers
     Route::delete('anak/{anakId}/raport-formal/{id}', [App\Http\Controllers\API\AdminShelter\AdminShelterRaportFormalController::class, 'destroy']);
 });
     
+    // Donatur routes
     Route::middleware('role:donatur')
     ->prefix('donatur')
     ->group(function () {
+        // Dashboard
         Route::get('/dashboard', [App\Http\Controllers\API\DonaturController::class, 'dashboard']);
-         Route::get('/profile', [App\Http\Controllers\API\DonaturController::class, 'getProfile']);
-        Route::post('/profile', [App\Http\Controllers\API\DonaturController::class, 'updateProfile']);
+
+        // Donatur Anak (Children)
         Route::get('/children', [App\Http\Controllers\Api\Donatur\DonaturAnakController::class, 'index']);
         Route::get('/children/{childId}', [App\Http\Controllers\Api\Donatur\DonaturAnakController::class, 'show']);
 
+        // Surat (Messages)
         Route::get('/children/{childId}/surat', [App\Http\Controllers\Api\Donatur\DonaturSuratController::class, 'index']);
         Route::post('/children/{childId}/surat', [App\Http\Controllers\Api\Donatur\DonaturSuratController::class, 'store']);
         Route::get('/children/{childId}/surat/{suratId}', [App\Http\Controllers\Api\Donatur\DonaturSuratController::class, 'show']);
         Route::put('/children/{childId}/surat/{suratId}/read', [App\Http\Controllers\Api\Donatur\DonaturSuratController::class, 'markAsRead']);
 
+        // Prestasi (Achievements)
         Route::get('/children/{childId}/prestasi', [App\Http\Controllers\Api\Donatur\DonaturPrestasiController::class, 'index']);
         Route::get('/children/{childId}/prestasi/{prestasiId}', [App\Http\Controllers\Api\Donatur\DonaturPrestasiController::class, 'show']);
         Route::put('/children/{childId}/prestasi/{prestasiId}/read', [App\Http\Controllers\Api\Donatur\DonaturPrestasiController::class, 'markAsRead']);
 
+        // Raport (Report Cards)
         Route::get('/children/{childId}/raport', [App\Http\Controllers\Api\Donatur\DonaturRaportController::class, 'index']);
         Route::get('/children/{childId}/raport/{raportId}', [App\Http\Controllers\Api\Donatur\DonaturRaportController::class, 'show']);
         Route::get('/children/{childId}/raport-summary', [App\Http\Controllers\Api\Donatur\DonaturRaportController::class, 'summary']);
 
+        // Aktivitas (Activities)
         Route::get('/children/{childId}/aktivitas', [App\Http\Controllers\Api\Donatur\DonaturAktivitasController::class, 'index']);
         Route::get('/children/{childId}/aktivitas/{aktivitasId}', [App\Http\Controllers\Api\Donatur\DonaturAktivitasController::class, 'show']);
         Route::get('/children/{childId}/attendance-summary', [App\Http\Controllers\Api\Donatur\DonaturAktivitasController::class, 'attendanceSummary']);
   
+         // Berita (News)
         Route::get('/berita', [App\Http\Controllers\API\Donatur\DonaturBeritaController::class, 'index']);
         Route::get('/berita/{id}', [App\Http\Controllers\API\Donatur\DonaturBeritaController::class, 'show']);
         Route::put('/berita/{id}/increment-view', [App\Http\Controllers\API\Donatur\DonaturBeritaController::class, 'incrementView']);
-
-        Route::prefix('marketplace')->group(function () {
-            Route::get('/available-children', [App\Http\Controllers\Api\Donatur\DonaturMarketplaceController::class, 'availableChildren']);
-            Route::get('/children/{childId}/profile', [App\Http\Controllers\Api\Donatur\DonaturMarketplaceController::class, 'childProfile']);
-            Route::post('/children/{childId}/sponsor', [App\Http\Controllers\Api\Donatur\DonaturSponsorshipController::class, 'sponsorChild']);
-            Route::get('/filters', [App\Http\Controllers\Api\Donatur\DonaturMarketplaceController::class, 'getFilters']);
-            Route::get('/featured-children', [App\Http\Controllers\Api\Donatur\DonaturMarketplaceController::class, 'featuredChildren']);
-        });
     });
 });
