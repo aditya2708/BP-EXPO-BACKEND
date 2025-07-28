@@ -6,6 +6,7 @@ use App\Models\Absen;
 use App\Models\AbsenUser;
 use App\Models\Anak;
 use App\Models\Aktivitas;
+use App\Models\Tutor;
 use App\Models\AttendanceVerification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -568,5 +569,62 @@ class AttendanceService
                                ->first();
         
         return $existingRecord ?: false;
+    }
+
+    public function getTutorActivitiesForHonor($id_tutor, $month, $year)
+    {
+        $startDate = Carbon::create($year, $month, 1)->startOfMonth();
+        $endDate = Carbon::create($year, $month, 1)->endOfMonth();
+
+        return Aktivitas::where('id_tutor', $id_tutor)
+            ->whereBetween('tanggal', [$startDate, $endDate])
+            ->whereHas('absen.absenUser', function($query) use ($id_tutor) {
+                $query->where('id_tutor', $id_tutor)
+                      ->whereHas('absen', function($subQuery) {
+                          $subQuery->whereIn('absen', ['Ya', 'Terlambat']);
+                      });
+            })
+            ->with(['absen.absenUser'])
+            ->get();
+    }
+
+    public function getStudentAttendanceCount($id_aktivitas)
+    {
+        return Absen::where('id_aktivitas', $id_aktivitas)
+            ->whereIn('absen', ['Ya', 'Terlambat'])
+            ->whereHas('absenUser', function($query) {
+                $query->whereNotNull('id_anak');
+            })
+            ->count();
+    }
+
+    public function getTutorAttendanceStats($id_tutor, $startDate, $endDate)
+    {
+        $absenUser = AbsenUser::where('id_tutor', $id_tutor)->first();
+        
+        if (!$absenUser) {
+            return [
+                'total_activities' => 0,
+                'attended_activities' => 0,
+                'attendance_rate' => 0
+            ];
+        }
+
+        $totalActivities = Aktivitas::where('id_tutor', $id_tutor)
+            ->whereBetween('tanggal', [$startDate, $endDate])
+            ->count();
+
+        $attendedActivities = Absen::where('id_absen_user', $absenUser->id_absen_user)
+            ->whereIn('absen', ['Ya', 'Terlambat'])
+            ->whereHas('aktivitas', function($query) use ($startDate, $endDate) {
+                $query->whereBetween('tanggal', [$startDate, $endDate]);
+            })
+            ->count();
+
+        return [
+            'total_activities' => $totalActivities,
+            'attended_activities' => $attendedActivities,
+            'attendance_rate' => $totalActivities > 0 ? round(($attendedActivities / $totalActivities) * 100, 2) : 0
+        ];
     }
 }
