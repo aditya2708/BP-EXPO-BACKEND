@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Keluarga extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'keluarga'; // Nama tabel
 
@@ -23,9 +24,11 @@ class Keluarga extends Model
         'id_bank',
         'no_rek',
         'an_rek',
-        'no_telp',
+        'no_tlp',
         'an_tlp',
     ];
+
+    protected $dates = ['deleted_at'];
 
     /**
      * Relasi ke tabel kacab.
@@ -81,6 +84,9 @@ class Keluarga extends Model
         return $this->hasMany(Survey::class, 'id_keluarga');
     }
 
-
+public function anak()
+{
+    return $this->hasMany(Anak::class, 'id_keluarga', 'id_keluarga');
+}
 
 }

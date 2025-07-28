@@ -11,7 +11,6 @@ class Anak extends Model
     use HasFactory;
 
     protected $table = 'anak';
-
     protected $primaryKey = 'id_anak';
 
     const STATUS_AKTIF = ['aktif', 'Aktif'];
@@ -19,8 +18,19 @@ class Anak extends Model
     const STATUS_DITOLAK = ['Ditolak', 'ditolak'];
     const STATUS_DITANGGUHKAN = ['Ditangguhkan', 'ditangguhkan'];
 
+    const STATUS_CPB_BCPB = 'BCPB';
+    const STATUS_CPB_NPB = 'NPB';
+    const STATUS_CPB_CPB = 'CPB';
+    const STATUS_CPB_PB = 'PB';
+
+    const STATUS_KELUARGA_DENGAN = 'dengan_keluarga';
+    const STATUS_KELUARGA_TANPA = 'tanpa_keluarga';
+    const STATUS_KELUARGA_PINDAH = 'pindah_keluarga';
+
     protected $attributes = [
-        'status_validasi' => 'tidak aktif',
+        'status_validasi' => 'aktif',
+        'status_cpb' => 'NPB',
+        'status_keluarga' => 'dengan_keluarga',
     ];
     
     protected $fillable = [
@@ -42,7 +52,8 @@ class Anak extends Model
         'tinggal_bersama',
         'status_validasi',
         'status_cpb',
-        'jenis_anak_binaan',
+        'status_keluarga',
+        'keterangan_keluarga',
         'hafalan',
         'pelajaran_favorit',
         'hobi',
@@ -51,12 +62,19 @@ class Anak extends Model
         'transportasi',
         'foto',
         'status',
+        'background_story',
+        'educational_goals',
+        'personality_traits',
+        'special_needs',
+        'marketplace_featured',
+        'sponsorship_date',
     ];
 
-    const STATUS_CPB_BCPB = 'BCPB';
-    const STATUS_CPB_NPB = 'NPB';
-    const STATUS_CPB_CPB = 'CPB';
-    const STATUS_CPB_PB = 'PB';
+    protected $casts = [
+        'personality_traits' => 'array',
+        'marketplace_featured' => 'boolean',
+        'sponsorship_date' => 'datetime',
+    ];
 
     public function scopeAktif($query)
     {
@@ -68,31 +86,111 @@ class Anak extends Model
         return $query->whereIn('status_validasi', self::STATUS_TIDAK_AKTIF);
     }
 
-    protected static function boot()
+    public function scopeAvailableForSponsorship($query)
     {
-        parent::boot();
- 
-        static::saving(function ($anak) {
-            $anak->updateStatusCpb();
+        return $query->where('status_cpb', self::STATUS_CPB_CPB)
+                    ->whereNull('id_donatur')
+                    ->whereIn('status_validasi', self::STATUS_AKTIF);
+    }
+
+    public function scopeByCpbStatus($query, $status)
+    {
+        return $query->where('status_cpb', $status);
+    }
+
+    public function scopeForCpbReport($query, $shelterId)
+    {
+        return $query->where('id_shelter', $shelterId)
+                    ->whereIn('status_validasi', self::STATUS_AKTIF)
+                    ->with(['kelompok', 'keluarga']);
+    }
+
+    public function scopeByKelas($query, $kelas)
+    {
+        return $query->whereHas('kelompok', function($q) use ($kelas) {
+            $q->where('kelas', $kelas);
         });
     }
- 
-    public function updateStatusCpb()
+
+    public function scopeByStatusOrangTua($query, $status)
     {
-        if ($this->status_cpb === self::STATUS_CPB_CPB || $this->status_cpb === self::STATUS_CPB_PB) {
-            return;
-        }
+        return $query->whereHas('keluarga', function($q) use ($status) {
+            $q->where('status_ortu', $status);
+        });
+    }
+
+    public function scopeFeaturedMarketplace($query)
+    {
+        return $query->where('marketplace_featured', true);
+    }
+
+    public function scopeByGender($query, $gender)
+    {
+        return $query->where('jenis_kelamin', $gender);
+    }
+
+    public function scopeByAgeRange($query, $minAge, $maxAge)
+    {
+        $currentDate = now();
+        $maxBirthDate = $currentDate->copy()->subYears($minAge);
+        $minBirthDate = $currentDate->copy()->subYears($maxAge + 1);
         
-        if ($this->jenis_anak_binaan == 'BPCB') {
-            $this->attributes['status_cpb'] = self::STATUS_CPB_BCPB;
-        } elseif ($this->jenis_anak_binaan == 'NPB') {
-            $this->attributes['status_cpb'] = self::STATUS_CPB_NPB;
-        }
+        return $query->whereBetween('tanggal_lahir', [$minBirthDate, $maxBirthDate]);
+    }
+
+    public function scopeByHafalan($query, $hafalan)
+    {
+        return $query->where('hafalan', $hafalan);
+    }
+
+    public function scopeByRegion($query, $shelterId)
+    {
+        return $query->where('id_shelter', $shelterId);
+    }
+
+    public function getUmurAttribute()
+    {
+        if (!$this->tanggal_lahir) return null;
+        return now()->diffInYears($this->tanggal_lahir);
+    }
+
+    public function getIsAvailableForSponsorshipAttribute()
+    {
+        return $this->status_cpb === self::STATUS_CPB_CPB && 
+               is_null($this->id_donatur) && 
+               in_array($this->status_validasi, self::STATUS_AKTIF);
     }
 
     public function keluarga()
     {
         return $this->belongsTo(Keluarga::class, 'id_keluarga', 'id_keluarga');
+    }
+
+    public function keluargaAktif()
+    {
+        return $this->belongsTo(Keluarga::class, 'id_keluarga', 'id_keluarga')->whereNull('deleted_at');
+    }
+
+    public function scopeWithActiveFamily($query)
+    {
+        return $query->whereHas('keluarga', function($q) {
+            $q->whereNull('deleted_at');
+        });
+    }
+
+    public function scopeByFamilyStatus($query, $status)
+    {
+        return $query->where('status_keluarga', $status);
+    }
+
+    public function scopeTanpaKeluarga($query)
+    {
+        return $query->where('status_keluarga', self::STATUS_KELUARGA_TANPA);
+    }
+
+    public function scopeDenganKeluarga($query)
+    {
+        return $query->where('status_keluarga', self::STATUS_KELUARGA_DENGAN);
     }
 
     public function anakPendidikan()
@@ -149,8 +247,13 @@ class Anak extends Model
     {
         return $this->hasMany(AbsenUser::class, 'id_anak');
     }
+
+    public function prestasi()
+    {
+        return $this->hasMany(Prestasi::class, 'id_anak');
+    }
     
-    protected $appends = ['foto_url'];
+    protected $appends = ['foto_url', 'umur'];
 
     public function getFotoUrlAttribute()
     {

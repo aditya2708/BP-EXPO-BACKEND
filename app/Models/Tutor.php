@@ -9,8 +9,8 @@ class Tutor extends Model
 {
     use HasFactory;
 
-    protected $table = 'tutor'; // Nama tabel
-    protected $primaryKey = 'id_tutor'; 
+    protected $table = 'tutor';
+    protected $primaryKey = 'id_tutor';
     
     protected $fillable = [
         'nama', 
@@ -22,13 +22,12 @@ class Tutor extends Model
         'id_wilbin', 
         'id_shelter', 
         'maple', 
+        'jenis_tutor',
         'foto'
-    ]; 
+    ];
 
-    // Add this to ensure foto_url is included in JSON responses
     protected $appends = ['foto_url'];
 
-    // Updated foto URL accessor to match Tutor model's storage path
     public function getFotoUrlAttribute()
     {
         if ($this->foto) {
@@ -38,17 +37,14 @@ class Tutor extends Model
         return url('images/default.png');
     }
 
-    // Relasi ke tabel kacab.
     public function kacab() {
         return $this->belongsTo(Kacab::class, 'id_kacab');
     }
 
-    // Relasi ke tabel wilbin.
     public function wilbin() {
         return $this->belongsTo(Wilbin::class, 'id_wilbin');
     }
 
-    // Relasi ke tabel shelter.
     public function shelter() {
         return $this->belongsTo(Shelter::class, 'id_shelter');
     }
@@ -56,5 +52,10 @@ class Tutor extends Model
     public function absenUser()
     {
         return $this->hasMany(AbsenUser::class, 'id_tutor');
+    }
+
+    public function competencies()
+    {
+        return $this->hasMany(TutorCompetency::class, 'id_tutor');
     }
 }

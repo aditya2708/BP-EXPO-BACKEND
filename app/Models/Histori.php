@@ -27,16 +27,15 @@ class Histori extends Model
         'is_read',
     ];
 
+    // Cast tanggal as date
+    protected $casts = [
+        'tanggal' => 'date',
+        'is_read' => 'boolean'
+    ];
+
     // Relasi ke model Anak
     public function anak()
     {
         return $this->belongsTo(Anak::class, 'id_anak');
     }
-    
-     // Relasi ke model Anak (yang dirawat)
-    // public function dirawatAnak()
-    // {
-    //     return $this->belongsTo(Anak::class, 'dirawat_id');
-    // }
-    
 }
